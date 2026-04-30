@@ -1,9 +1,11 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from './supabaseClient';
 import { Search, ArrowRight, Star, ChevronRight, ChevronLeft, BadgeCheck, Play, Smartphone, Check, CreditCard, Building2, PartyPopper, Clock, User } from 'lucide-react';
 
 export default function ThayyaPlatform() {
+  const router = useRouter();
   const [role, setRole] = useState('member');
   const [pages, setPages] = useState({ member: 'discover', instructor: 'today', admin: 'overview' });
   const [checkoutStep, setCheckoutStep] = useState(1);
@@ -129,6 +131,7 @@ export default function ThayyaPlatform() {
               </div>
             ) : (
               <button
+                onClick={() => router.push('/login')}
                 className="px-3 py-1.5 rounded-full text-xs md:text-sm font-semibold"
                 style={{ background: 'white', border: '1px solid var(--line)', color: 'var(--ink)' }}
               >
