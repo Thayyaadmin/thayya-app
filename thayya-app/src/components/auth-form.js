@@ -15,17 +15,6 @@ export function AuthForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [formMessage, setFormMessage] = useState("");
-  const supabaseHost = (() => {
-    const rawUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim().replace(/^['"]+|['"]+$/g, "");
-    if (!rawUrl) return "missing NEXT_PUBLIC_SUPABASE_URL";
-
-    const withProtocol = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
-    try {
-      return new URL(withProtocol).host;
-    } catch {
-      return rawUrl;
-    }
-  })();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -218,9 +207,6 @@ export function AuthForm() {
 
       <p className="text-center text-xs text-muted-foreground mt-8">
         Dance your way to fitness with Thayya
-      </p>
-      <p className="text-center text-[11px] text-muted-foreground/80 mt-2">
-        Auth host: {supabaseHost}
       </p>
     </div>
   );

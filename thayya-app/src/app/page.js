@@ -73,6 +73,7 @@ export default function ThayyaPlatform() {
     if (priceValue === null || priceValue === undefined || priceValue === '') return 'Price unavailable';
     return typeof priceValue === 'number' ? `₹${priceValue}` : String(priceValue);
   };
+  const userEmail = user?.email || 'User account';
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
@@ -116,11 +117,14 @@ export default function ThayyaPlatform() {
                 <button
                   className="w-9 h-9 rounded-full flex items-center justify-center"
                   style={{ background: 'white', border: '1px solid var(--line)' }}
-                  aria-label="User Profile"
-                  title="User Profile"
+                  aria-label={`User Profile (${userEmail})`}
+                  title={userEmail}
                 >
                   <User className="w-4 h-4" style={{ color: 'var(--ink-soft)' }} />
                 </button>
+                <span className="hidden lg:inline text-xs" style={{ color: 'var(--ink-muted)' }}>
+                  {userEmail}
+                </span>
                 <button
                   onClick={handleSignOut}
                   className="px-3 py-1.5 rounded-full text-xs md:text-sm font-semibold"
