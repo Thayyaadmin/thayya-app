@@ -1,12 +1,54 @@
 "use client";
-import React, { useState } from 'react';
-import { Search, ArrowRight, Star, ChevronRight, ChevronLeft, BadgeCheck, Play, Smartphone, Check, CreditCard, Building2, PartyPopper, Clock, MapPin, Filter, ArrowUpRight, Music, Plus, Upload, UsersRound, TrendingUp, IndianRupee, Sparkles, Award, Heart } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from './supabaseClient';
+import { Search, ArrowRight, Star, ChevronRight, ChevronLeft, BadgeCheck, Play, Smartphone, Check, CreditCard, Building2, PartyPopper, Clock, User } from 'lucide-react';
 
 export default function ThayyaPlatform() {
   const [role, setRole] = useState('member');
   const [pages, setPages] = useState({ member: 'discover', instructor: 'today', admin: 'overview' });
   const [checkoutStep, setCheckoutStep] = useState(1);
+  const [workshops, setWorkshops] = useState([]);
+  const [isLoadingWorkshops, setIsLoadingWorkshops] = useState(true);
+  const [workshopsError, setWorkshopsError] = useState('');
+  const [user, setUser] = useState(null);
 
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error('Error fetching user:', error.message);
+        setUser(null);
+        return;
+      }
+      setUser(data?.user ?? null);
+    };
+
+    fetchCurrentUser();
+  }, []);
+
+  useEffect(() => {
+    const fetchWorkshops = async () => {
+      setIsLoadingWorkshops(true);
+      setWorkshopsError('');
+
+      const { data, error } = await supabase
+        .from('workshops')
+        .select('*');
+
+      if (error) {
+        setWorkshops([]);
+        setWorkshopsError(error.message || 'Unable to fetch workshops.');
+        console.error('Error fetching workshops table:', error);
+        setIsLoadingWorkshops(false);
+        return;
+      }
+
+      setWorkshops(Array.isArray(data) ? data : []);
+      setIsLoadingWorkshops(false);
+      console.log('Workshops loaded from Supabase workshops table:', data);
+    };
+    fetchWorkshops();
+  }, []);
   const switchRole = (newRole) => {
     setRole(newRole);
     if (newRole === 'member') setCheckoutStep(1);
@@ -20,6 +62,23 @@ export default function ThayyaPlatform() {
   };
 
   const completeBooking = () => setCheckoutStep(2);
+  const formatWorkshopDate = (dateValue) => {
+    if (!dateValue) return 'Date not available';
+    const parsedDate = new Date(dateValue);
+    return Number.isNaN(parsedDate.getTime()) ? String(dateValue) : parsedDate.toLocaleString();
+  };
+  const formatWorkshopPrice = (priceValue) => {
+    if (priceValue === null || priceValue === undefined || priceValue === '') return 'Price unavailable';
+    return typeof priceValue === 'number' ? `₹${priceValue}` : String(priceValue);
+  };
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('Error signing out:', error.message);
+      return;
+    }
+    window.location.reload();
+  };
 
   // Reusable Nav Pill component
   const NavPill = ({ label, targetPage }) => {
@@ -43,10 +102,39 @@ export default function ThayyaPlatform() {
             {/* The Logo will pull from your public folder */}
             <img src="/Logo.jpg" alt="Thayya Official Logo" className="h-10 w-auto object-contain" />
           </div>
-          <div className="flex items-center gap-1 p-1 rounded-full" style={{ background: 'white', border: '1px solid var(--line)' }}>
-            <button onClick={() => switchRole('member')} className={`px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm font-semibold transition-all ${role === 'member' ? 'bg-[var(--ink)] text-white' : 'text-[var(--ink-soft)]'}`}>Member</button>
-            <button onClick={() => switchRole('instructor')} className={`px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm font-semibold transition-all ${role === 'instructor' ? 'bg-[var(--ink)] text-white' : 'text-[var(--ink-soft)]'}`}>Instructor</button>
-            <button onClick={() => switchRole('admin')} className={`px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm font-semibold transition-all ${role === 'admin' ? 'bg-[var(--ink)] text-white' : 'text-[var(--ink-soft)]'}`}>Admin</button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 p-1 rounded-full" style={{ background: 'white', border: '1px solid var(--line)' }}>
+              <button onClick={() => switchRole('member')} className={`px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm font-semibold transition-all ${role === 'member' ? 'bg-[var(--ink)] text-white' : 'text-[var(--ink-soft)]'}`}>Member</button>
+              <button onClick={() => switchRole('instructor')} className={`px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm font-semibold transition-all ${role === 'instructor' ? 'bg-[var(--ink)] text-white' : 'text-[var(--ink-soft)]'}`}>Instructor</button>
+              <button onClick={() => switchRole('admin')} className={`px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm font-semibold transition-all ${role === 'admin' ? 'bg-[var(--ink)] text-white' : 'text-[var(--ink-soft)]'}`}>Admin</button>
+            </div>
+
+            {user ? (
+              <div className="flex items-center gap-2">
+                <button
+                  className="w-9 h-9 rounded-full flex items-center justify-center"
+                  style={{ background: 'white', border: '1px solid var(--line)' }}
+                  aria-label="User Profile"
+                  title="User Profile"
+                >
+                  <User className="w-4 h-4" style={{ color: 'var(--ink-soft)' }} />
+                </button>
+                <button
+                  onClick={handleSignOut}
+                  className="px-3 py-1.5 rounded-full text-xs md:text-sm font-semibold"
+                  style={{ background: 'white', border: '1px solid var(--line)', color: 'var(--ink)' }}
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <button
+                className="px-3 py-1.5 rounded-full text-xs md:text-sm font-semibold"
+                style={{ background: 'white', border: '1px solid var(--line)', color: 'var(--ink)' }}
+              >
+                Log In
+              </button>
+            )}
           </div>
         </div>
         <div className="max-w-[1400px] mx-auto px-4 md:px-6 pb-2 flex items-center justify-between">
@@ -126,25 +214,37 @@ export default function ThayyaPlatform() {
                     <h2 className="font-display text-2xl md:text-3xl font-bold">Workshops this week</h2>
                   </div>
                 </div>
+                {workshopsError && (
+                  <p className="text-sm mb-3" style={{ color: 'var(--t-red)' }}>
+                    Could not load live workshops: {workshopsError}
+                  </p>
+                )}
                 <div className="space-y-3">
-                  {[
-                    { av: 'av-1', ini: 'AK', title: 'Bollywood Cardio · Beginner', sub: 'Anaya Krishnan · Mon · 6:30 PM', price: '₹450', spots: '7 spots left', color: 'var(--t-red)' },
-                    { av: 'av-2', ini: 'RM', title: 'Bombay Bounce', sub: 'Rohan Mehta · Tue · 7:00 PM', price: '₹500', spots: '3 spots left', color: 'var(--t-red)' },
-                    { av: 'av-3', ini: 'PN', title: 'Mohiniyattam Slow Flow', sub: 'Priya Nair · Wed · 8:00 AM', price: '₹400', spots: '12 spots left', color: 'var(--t-teal)' }
-                  ].map((ws, i) => (
-                    <button key={i} onClick={() => showPage('member','book')} className="w-full text-left lift p-4 rounded-2xl flex items-center gap-4" style={{ background: 'white', border: '1px solid var(--line)' }}>
-                      <div className={`w-12 h-12 rounded-full ${ws.av} flex items-center justify-center text-white font-display font-bold text-sm shrink-0`}>{ws.ini}</div>
+                  {isLoadingWorkshops ? (
+                    <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
+                      Loading...
+                    </p>
+                  ) : workshops.length > 0 ? workshops.map((ws, i) => (
+                    <button key={ws.id || i} onClick={() => showPage('member','book')} className="w-full text-left lift p-4 rounded-2xl flex items-center gap-4" style={{ background: 'white', border: '1px solid var(--line)' }}>
+                      <div className={`w-12 h-12 rounded-full av-${(i % 4) + 1} flex items-center justify-center text-white font-display font-bold text-sm shrink-0`}>
+                        {(ws.title || 'W').slice(0, 1).toUpperCase()}
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-display text-base md:text-lg font-bold truncate">{ws.title}</div>
-                        <div className="text-xs" style={{ color: 'var(--ink-muted)' }}>{ws.sub}</div>
+                        <div className="font-display text-base md:text-lg font-bold truncate">{ws.title || 'Untitled workshop'}</div>
+                        <div className="text-xs" style={{ color: 'var(--ink-muted)' }}>
+                          {ws.instructor || ws.instructor_name || 'Instructor TBA'} · {formatWorkshopDate(ws.date)}
+                        </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-display text-base md:text-lg font-bold gradient-text">{ws.price}</div>
-                        <div className="text-[10px] font-semibold" style={{ color: ws.color }}>{ws.spots}</div>
+                        <div className="font-display text-base md:text-lg font-bold gradient-text">{formatWorkshopPrice(ws.price)}</div>
                       </div>
                       <ChevronRight className="w-4 h-4 hidden md:block" style={{ color: 'var(--ink-muted)' }} />
                     </button>
-                  ))}
+                  )) : (
+                    <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
+                      No workshops available right now.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
