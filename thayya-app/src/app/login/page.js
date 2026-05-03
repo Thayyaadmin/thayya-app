@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { AuthForm } from "@/components/auth-form";
 
 export default function AuthPage() {
@@ -8,7 +9,9 @@ export default function AuthPage() {
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-accent/5 rounded-full blur-3xl transform -translate-x-1/2 translate-y-1/2" />
       </div>
 
-      <AuthForm />
+      <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+        <AuthForm />
+      </Suspense>
     </main>
   );
 }

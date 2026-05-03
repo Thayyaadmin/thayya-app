@@ -126,6 +126,14 @@ export default function ThayyaPlatform() {
                   {userEmail}
                 </span>
                 <button
+                  type="button"
+                  onClick={() => router.push('/dashboard')}
+                  className="px-3 py-1.5 rounded-full text-xs md:text-sm font-semibold hidden sm:inline-flex"
+                  style={{ background: 'white', border: '1px solid var(--line)', color: 'var(--ink)' }}
+                >
+                  Dashboard
+                </button>
+                <button
                   onClick={handleSignOut}
                   className="px-3 py-1.5 rounded-full text-xs md:text-sm font-semibold"
                   style={{ background: 'white', border: '1px solid var(--line)', color: 'var(--ink)' }}

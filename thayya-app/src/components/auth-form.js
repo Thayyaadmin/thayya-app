@@ -2,12 +2,21 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { supabase } from "@/app/supabaseClient";
 
+function safeNextPath(next) {
+  if (!next || typeof next !== "string") return "/";
+  const trimmed = next.trim();
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return "/";
+  if (trimmed.includes("\\")) return "/";
+  return trimmed;
+}
+
 export function AuthForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,7 +39,7 @@ export function AuthForm() {
         });
 
         if (error) throw error;
-        router.push("/");
+        router.push(safeNextPath(searchParams.get("next")));
         router.refresh();
         return;
       }
@@ -43,7 +52,7 @@ export function AuthForm() {
       if (error) throw error;
 
       if (data?.session) {
-        router.push("/");
+        router.push(safeNextPath(searchParams.get("next")));
         router.refresh();
         return;
       }

@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local v0 unpack scratch (do not commit)
+/_v0-dashboard-unpack
