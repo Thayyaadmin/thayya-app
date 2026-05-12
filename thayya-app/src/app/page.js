@@ -35,7 +35,7 @@ export default function ThayyaPlatform() {
 
       const { data, error } = await supabase
         .from('workshops')
-        .select('*');
+        .select('*, instructor_profile:profiles!instructor_id(id, full_name, user_type)');
 
       if (error) {
         setWorkshops([]);
@@ -247,7 +247,7 @@ export default function ThayyaPlatform() {
                       <div className="flex-1 min-w-0">
                         <div className="font-display text-base md:text-lg font-bold truncate">{ws.title || 'Untitled workshop'}</div>
                         <div className="text-xs" style={{ color: 'var(--ink-muted)' }}>
-                          {ws.instructor || ws.instructor_name || 'Instructor TBA'} · {formatWorkshopDate(ws.date)}
+                          {ws.instructor_profile?.full_name || ws.instructor || ws.instructor_name || 'Instructor TBA'} · {formatWorkshopDate(ws.date)}
                         </div>
                       </div>
                       <div className="text-right">

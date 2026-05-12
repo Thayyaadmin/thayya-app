@@ -30,11 +30,8 @@ export async function saveWorkshop(
     return { ok: false, error: 'Title is required.' };
   }
 
-  const instructorRaw = String(formData.get('instructor') || '').trim();
-  const instructor = instructorRaw || null;
   const dateRaw = formData.get('date');
-  const date =
-    dateRaw === null || dateRaw === '' ? null : String(dateRaw);
+  const date = dateRaw === null || dateRaw === '' ? null : String(dateRaw);
   const price = parsePrice(formData.get('price'));
 
   if (intent === 'update') {
@@ -43,9 +40,11 @@ export async function saveWorkshop(
       return { ok: false, error: 'Missing workshop id.' };
     }
 
+    // instructor_id is fixed at creation time (enforced by trigger + RLS) — we never
+    // include it in update payloads.
     const { error } = await supabase
       .from('workshops')
-      .update({ title, instructor, date, price })
+      .update({ title, date, price })
       .eq('id', id);
 
     if (error) {
@@ -56,9 +55,39 @@ export async function saveWorkshop(
     return { ok: true };
   }
 
-  const { error } = await supabase
-    .from('workshops')
-    .insert({ title, instructor, date, price });
+  // Create: enforce that the caller is an instructor (or admin) and stamp them
+  // as the workshop's instructor. RLS double-checks this server-side.
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('user_type, full_name')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    return { ok: false, error: profileError.message };
+  }
+  if (!profile) {
+    return {
+      ok: false,
+      error: 'Your profile is not set up yet. Please complete your profile and try again.',
+    };
+  }
+  if (profile.user_type !== 'instructor' && profile.user_type !== 'admin') {
+    return {
+      ok: false,
+      error: 'Only instructors can create workshops.',
+    };
+  }
+
+  const { error } = await supabase.from('workshops').insert({
+    title,
+    date,
+    price,
+    instructor_id: user.id,
+    // Keep the legacy text column in sync for any code/queries that still
+    // read it directly. Read paths should prefer the joined profile name.
+    instructor: profile.full_name,
+  });
 
   if (error) {
     return { ok: false, error: error.message };
@@ -82,6 +111,8 @@ export async function deleteWorkshop(workshopId: string): Promise<WorkshopAction
     return { ok: false, error: 'Missing workshop id.' };
   }
 
+  // RLS limits the row set to ones the caller owns, so this is both
+  // safe and self-scoping.
   const { error } = await supabase.from('workshops').delete().eq('id', workshopId);
 
   if (error) {

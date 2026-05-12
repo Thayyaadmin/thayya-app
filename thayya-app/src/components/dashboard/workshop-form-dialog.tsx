@@ -87,30 +87,22 @@ export function WorkshopFormDialog({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor={mode === "create" ? "wf-instructor-display" : "wf-instructor"}>
-              Instructor
-            </Label>
-            {mode === "create" ? (
-              <>
-                <input type="hidden" name="instructor" value={defaultInstructorName} />
-                <p
-                  id="wf-instructor-display"
-                  className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-foreground"
-                >
-                  {defaultInstructorName || "—"}
-                </p>
-                <p className="text-xs text-muted-foreground">From your signed-in account.</p>
-              </>
-            ) : (
-              <Input
-                id="wf-instructor"
-                name="instructor"
-                defaultValue={
-                  initial?.instructor && initial.instructor !== "—" ? initial.instructor : undefined
-                }
-                placeholder="Instructor name"
-              />
-            )}
+            <Label htmlFor="wf-instructor-display">Instructor</Label>
+            <p
+              id="wf-instructor-display"
+              className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-foreground"
+            >
+              {mode === "edit"
+                ? initial?.instructor && initial.instructor !== "—"
+                  ? initial.instructor
+                  : "—"
+                : defaultInstructorName || "—"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {mode === "edit"
+                ? "Linked to the instructor who created this workshop."
+                : "From your signed-in account."}
+            </p>
           </div>
 
           <div className="grid gap-2">

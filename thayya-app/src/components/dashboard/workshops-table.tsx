@@ -61,7 +61,15 @@ function mapDbRowToWorkshop(row: Record<string, unknown>): WorkshopRow | null {
   if (row.id === undefined || row.id === null) return null
 
   const title = row.title != null ? String(row.title) : "Untitled workshop"
-  const instructorRaw = row.instructor ?? row.instructor_name
+
+  // Prefer the linked profile's full_name (source of truth). Fall back to the
+  // legacy `instructor` / `instructor_name` text columns for rows that pre-date
+  // the FK or were never matched during backfill.
+  const profile = row.instructor_profile as { full_name?: string | null } | null | undefined
+  const instructorRaw =
+    (profile && typeof profile.full_name === "string" && profile.full_name) ||
+    row.instructor ||
+    row.instructor_name
   const instructor =
     instructorRaw != null && instructorRaw !== "" ? String(instructorRaw) : "—"
 
@@ -118,7 +126,9 @@ export function WorkshopsTable({ refreshToken = 0, onEdit }: WorkshopsTableProps
     setLoading(true)
     setLoadError(null)
 
-    const { data, error } = await supabase.from("workshops").select("*")
+    const { data, error } = await supabase
+      .from("workshops")
+      .select("*, instructor_profile:profiles!instructor_id(id, full_name, user_type)")
 
     if (error) {
       console.error("Workshops fetch error:", error)
