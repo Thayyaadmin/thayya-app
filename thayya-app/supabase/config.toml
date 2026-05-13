@@ -27,3 +27,7 @@ verify_jwt = true
 # Instructor/admin create/update workshop; validates JWT then writes with service role.
 [functions.save-workshop]
 verify_jwt = true
+
+# JWT: workshops where instructor_id = auth.uid(), upcoming first (then undated, then past).
+[functions.instructor-workshops]
+verify_jwt = true
