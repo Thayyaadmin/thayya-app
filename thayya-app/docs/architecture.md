@@ -38,23 +38,38 @@ thayya-app/
 │   └── workshops-rls.sql               # DEPRECATED — see workshops-instructor-id.sql
 ├── src/
 │   ├── app/
-│   │   ├── page.js                     # Public landing (member/instructor/admin role-switcher prototype)
+│   │   ├── page.tsx                    # Redirects `/` → `/member/discover`
+│   │   ├── (site)/                     # Route group: shared marketing shell (header/footer)
+│   │   │   ├── layout.tsx              # Server: session + profile → filtered portal links
+│   │   │   ├── member/                 # `/member/*` (discover, book, bookings, membership)
+│   │   │   ├── instructor/             # `/instructor/*` (instructor portal + stubs)
+│   │   │   ├── instructors/[slug]/     # Public per-instructor page (same URL; uses site layout)
+│   │   │   └── admin/                  # `/admin/*` (admin-only layout guard)
 │   │   ├── login/                      # Auth entry point
-│   │   ├── dashboard/                  # Signed-in instructor dashboard
-│   │   ├── instructors/[slug]/         # Public per-instructor page (SSR, SEO-friendly)
+│   │   ├── dashboard/                  # Signed-in instructor workshop management
 │   │   └── supabaseClient.js           # Browser Supabase client (cookie session)
 │   ├── components/
+│   │   ├── site/                       # Marketing UI: atoms / molecules / elements (see below)
 │   │   ├── auth-form.js                # Signup + login form
 │   │   ├── dashboard/                  # Dashboard widgets
 │   │   └── ui/                         # shadcn-style primitives
+│   ├── portals/                        # Portal shells + sticky sub-nav (member, instructor, admin)
 │   └── lib/
 │       ├── supabase/
 │       │   ├── server.ts               # Server-component Supabase client
 │       │   └── middleware.ts           # Edge middleware: session refresh + /dashboard gate
 │       ├── supabase-env.js             # Env var loading & URL normalization
 │       ├── profile.ts                  # Profile types + fetch/update helpers
+│       ├── site-portals.ts             # Which portal links to show from profiles.user_type
+│       ├── discover-data.ts            # Server queries for Discover page workshops/instructors
 │       └── instructor-profile.ts       # Display-name + initials helpers (reads user_metadata)
 ```
+
+**Marketing UI composition (`src/components/site/`):**
+
+- **`atoms/`** — smallest reusable pieces (e.g. eyebrow labels).
+- **`molecules/`** — combine atoms (e.g. instructor card, workshop row, search bar).
+- **`elements/`** — page sections composed of molecules (e.g. discover hero, instructors grid); imported by `app/(site)/**/page.tsx`.
 
 ---
 
@@ -241,7 +256,7 @@ Each instructor gets a dedicated, server-rendered, SEO-friendly page.
     job at insert.
 
 ### Route
-File: `src/app/instructors/[slug]/page.tsx`
+File: `src/app/(site)/instructors/[slug]/page.tsx`
 
 - Server component using `createSupabaseServerClient()`.
 - Returns `notFound()` (404) when no profile matches the slug, or when
@@ -254,7 +269,7 @@ File: `src/app/instructors/[slug]/page.tsx`
   `instructor_id = profile.id`, ordered ascending.
 
 ### Discover list
-The "Instructors near you" grid on `src/app/page.js` now reads from
+The "Instructors near you" grid on `/member/discover` (`src/app/(site)/member/discover/page.tsx`) reads from
 `profiles where user_type = 'instructor' and slug is not null`, ordered
 by `created_at desc`, limited to 8. Clicks navigate to
 `/instructors/<slug>` (no longer a tab switch).
@@ -280,6 +295,7 @@ and skip the rest. Add columns to `profiles` when you want them:
 
 | Date | Decision | Why |
 | --- | --- | --- |
+| 2026-05-13 | Split the old single-file marketing home into real routes under `app/(site)/` with a shared layout; portal links filtered by `profiles.user_type`. | Shareable URLs, SSR for discover data, global header/footer, no fake role switcher. |
 | 2026-05-12 | Use a `profiles` table backed by `auth.users` rather than only `user_metadata`. | Need a real FK target for `workshops.instructor_id`, easier RLS, easier joins. |
 | 2026-05-12 | `handle_new_user` trigger creates the profile row at signup time. | Atomic with auth.users; works even when email confirmation defers session. Considered moving to app-side `ensureProfile()` but the trigger costs less complexity overall. |
 | 2026-05-12 | `workshops.instructor_id` is FK-to-profile, set once at create, never mutated. | Renames in `profiles.full_name` should propagate to displayed workshops; ownership shouldn't be transferable through the UI. |

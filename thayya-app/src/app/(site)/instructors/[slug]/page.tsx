@@ -57,6 +57,21 @@ function formatPrice(value: number | null): string {
   }).format(value);
 }
 
+/** Leading name segment(s) + last segment for gradient highlight (discover-hero style). */
+function splitNameForGradientHeading(fullName: string): { lead: string; gradient: string } {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return { lead: "", gradient: fullName.trim() || "Instructor" };
+  }
+  if (parts.length === 1) {
+    return { lead: "", gradient: parts[0]! };
+  }
+  return {
+    lead: parts.slice(0, -1).join(" "),
+    gradient: parts[parts.length - 1]!,
+  };
+}
+
 async function loadInstructor(slug: string) {
   const supabase = await createSupabaseServerClient();
   const profile = await getProfileBySlug(supabase, slug);
@@ -120,54 +135,57 @@ export default async function InstructorPage(
   const bio =
     profile.bio?.trim() ||
     `${profile.full_name} hasn't added a bio yet — check back soon for more about their style and classes.`;
+  const { lead: nameLead, gradient: nameGradient } = splitNameForGradientHeading(profile.full_name);
 
   return (
-    <div className="page max-w-[1200px] mx-auto px-4 md:px-8 py-8 md:py-12">
+    <div className="page mx-auto max-w-[1200px] px-4 py-8 md:px-8 md:py-12">
       <Link
-        href="/"
-        className="flex items-center gap-1 text-sm mb-6"
+        href="/member/discover"
+        className="mb-6 flex items-center gap-1 text-sm"
         style={{ color: "var(--ink-soft)" }}
       >
-        <ChevronLeft className="w-4 h-4" /> Back
+        <ChevronLeft className="h-4 w-4" /> Back to discover
       </Link>
 
-      <div className="grid md:grid-cols-3 gap-8 md:gap-10 items-start mb-12">
+      <div className="mb-12 grid items-start gap-8 md:grid-cols-3 md:gap-10">
         <div
-          className={`aspect-square rounded-3xl av-${avVariant} grain relative max-w-[320px] mx-auto md:mx-0`}
+          className={`av-${avVariant} relative mx-auto aspect-square max-w-[320px] rounded-3xl grain md:mx-0`}
         >
-          <div className="w-full h-full flex items-center justify-center font-display text-7xl md:text-8xl font-bold text-white/95">
+          <div className="flex h-full w-full items-center justify-center font-display text-7xl font-bold text-white/95 md:text-8xl">
             {initials}
           </div>
-          <div className="absolute bottom-4 right-4 px-3 py-1 rounded-full bg-white/90 backdrop-blur text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-            <BadgeCheck className="w-3 h-3" style={{ color: "var(--t-magenta)" }} /> Instructor
+          <div className="absolute right-4 bottom-4 flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold tracking-wider uppercase backdrop-blur">
+            <BadgeCheck className="h-3 w-3" style={{ color: "var(--t-magenta)" }} /> Instructor
           </div>
         </div>
         <div className="md:col-span-2">
           <div
-            className="text-[11px] tracking-[0.25em] uppercase mb-3 font-semibold"
+            className="mb-3 text-[11px] font-semibold tracking-[0.25em] uppercase"
             style={{ color: "var(--ink-muted)" }}
           >
             Thayya Instructor
           </div>
-          <h1 className="font-display text-4xl md:text-6xl font-bold mb-4 leading-[1.05]">
-            {profile.full_name}
+          <h1 className="font-display mb-4 text-4xl leading-[1.05] font-bold md:text-6xl">
+            {nameLead ? (
+              <>
+                {nameLead}{" "}
+              </>
+            ) : null}
+            <span className="gradient-text">{nameGradient}</span>
           </h1>
-          <p
-            className="text-base mb-6 leading-relaxed"
-            style={{ color: "var(--ink-soft)" }}
-          >
+          <p className="mb-6 text-base leading-relaxed" style={{ color: "var(--ink-soft)" }}>
             {bio}
           </p>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="gradient-bg-warm text-white px-5 py-2.5 rounded-full text-sm font-bold"
+              className="gradient-bg-warm rounded-full px-5 py-2.5 text-sm font-bold text-white"
             >
               Follow
             </button>
             <button
               type="button"
-              className="px-5 py-2.5 rounded-full text-sm font-bold border"
+              className="rounded-full border px-5 py-2.5 text-sm font-bold"
               style={{ borderColor: "var(--line)", background: "white" }}
             >
               Refer a friend
@@ -178,17 +196,17 @@ export default async function InstructorPage(
 
       <div className="mb-6">
         <div
-          className="text-[10px] tracking-[0.25em] uppercase mb-1 font-semibold"
+          className="mb-1 text-[10px] font-semibold tracking-[0.25em] uppercase"
           style={{ color: "var(--ink-muted)" }}
         >
           Schedule
         </div>
-        <h2 className="font-display text-2xl md:text-3xl font-bold">Upcoming workshops</h2>
+        <h2 className="font-display text-2xl font-bold md:text-3xl">Upcoming workshops</h2>
       </div>
 
       {workshops.length === 0 ? (
         <p
-          className="text-sm rounded-2xl p-5"
+          className="rounded-2xl p-5 text-sm"
           style={{
             background: "white",
             border: "1px solid var(--line)",
@@ -198,26 +216,24 @@ export default async function InstructorPage(
           No upcoming workshops yet. Follow {profile.full_name} to be the first to know.
         </p>
       ) : (
-        <div className="grid md:grid-cols-3 gap-3">
+        <div className="grid gap-3 md:grid-cols-3">
           {workshops.map((ws) => {
             const price = formatPrice(ws.price);
             return (
               <div
                 key={ws.id}
-                className="lift text-left p-5 rounded-2xl"
+                className="lift rounded-2xl p-5 text-left"
                 style={{ background: "white", border: "1px solid var(--line)" }}
               >
-                <div className="font-display text-lg font-bold mb-1">
+                <div className="font-display mb-1 text-lg font-bold">
                   {ws.title || "Untitled workshop"}
                 </div>
-                <div className="text-xs mb-4" style={{ color: "var(--ink-muted)" }}>
+                <div className="mb-4 text-xs" style={{ color: "var(--ink-muted)" }}>
                   {formatWorkshopDate(ws.date)}
                 </div>
                 {price ? (
                   <div className="flex items-center justify-between">
-                    <span className="font-display text-xl font-bold gradient-text">
-                      {price}
-                    </span>
+                    <span className="font-display text-xl font-bold gradient-text">{price}</span>
                   </div>
                 ) : null}
               </div>
