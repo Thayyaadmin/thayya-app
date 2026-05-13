@@ -22,10 +22,26 @@ type Body = {
   country?: string | null;
 };
 
+/** Accept object or JSON string (some clients stringify nested bodies). */
+function unwrapGeoInput(raw: unknown): unknown {
+  if (raw == null) return null;
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    if (!t) return null;
+    try {
+      return JSON.parse(t) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  return raw;
+}
+
 function parseGeoPoint(p: unknown): GeoJsonPoint | null {
-  if (p == null) return null;
-  if (typeof p !== "object" || p === null) return null;
-  const o = p as Record<string, unknown>;
+  const unwrapped = unwrapGeoInput(p);
+  if (unwrapped == null) return null;
+  if (typeof unwrapped !== "object" || unwrapped === null) return null;
+  const o = unwrapped as Record<string, unknown>;
   if (o.type !== "Point" || !Array.isArray(o.coordinates)) return null;
   const c = o.coordinates as unknown[];
   if (c.length < 2) return null;
@@ -34,6 +50,12 @@ function parseGeoPoint(p: unknown): GeoJsonPoint | null {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
   return { type: "Point", coordinates: [lng, lat] };
+}
+
+/** PostgREST + `geography(Point,4326)` reliably accepts EWKT; raw GeoJSON often triggers "invalid geometry". */
+function pointToEwkt(geo: GeoJsonPoint): string {
+  const [lng, lat] = geo.coordinates;
+  return `SRID=4326;POINT(${lng} ${lat})`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -130,7 +152,7 @@ Deno.serve(async (req: Request) => {
   const patch: Record<string, unknown> = {
     user_type: userType,
     full_name: fullName,
-    primary_location: geo,
+    primary_location: geo ? pointToEwkt(geo) : null,
     address_line,
     city: city || null,
     state,
@@ -147,7 +169,7 @@ Deno.serve(async (req: Request) => {
     .update(patch)
     .eq("id", user.id)
     .select(
-      "id, user_type, full_name, bio, slug, primary_location, address_line, city, state, country, created_at, updated_at",
+      "id, user_type, full_name, bio, slug, avatar_url, primary_location, address_line, city, state, country, created_at, updated_at",
     )
     .single();
 
