@@ -50,9 +50,11 @@ thayya-app/
 │   │   └── supabaseClient.js           # Browser Supabase client (cookie session)
 │   ├── components/
 │   │   ├── site/                       # Marketing UI: atoms / molecules / elements (see below)
+│   │   ├── auth/                       # Auth-only UI (e.g. instructor primary location field)
 │   │   ├── auth-form.js                # Signup + login form
 │   │   ├── dashboard/                  # Dashboard widgets
 │   │   └── ui/                         # shadcn-style primitives
+│   ├── contexts/                       # Client React context (e.g. member browsing location)
 │   ├── portals/                        # Portal shells + sticky sub-nav (member, instructor, admin)
 │   └── lib/
 │       ├── supabase/
@@ -61,7 +63,11 @@ thayya-app/
 │       ├── supabase-env.js             # Env var loading & URL normalization
 │       ├── profile.ts                  # Profile types + fetch/update helpers
 │       ├── site-portals.ts             # Which portal links to show from profiles.user_type
-│       ├── discover-data.ts            # Server queries for Discover page workshops/instructors
+│       ├── discover-data.ts            # Server/client Edge helpers for discover-* functions
+│       ├── discover-instructors-browser.ts  # Member client GET discover-instructors with lat/lng
+│       ├── member-viewer-location-storage.ts # localStorage key for member browsing pin
+│       ├── primary-location.ts         # Parse Google Places result → GeoJSON + address fields
+│       ├── register-user-profile.ts    # Client POST to register-user-profile Edge Function
 │       └── instructor-profile.ts       # Display-name + initials helpers (reads user_metadata)
 ```
 
@@ -138,9 +144,34 @@ auth.users (1) ──┬── (1) public.profiles
        │   resolves user_type / full_name / bio with safe fallbacks,
        │   and inserts a matching row into public.profiles.
        ▼
-4. Profile row exists. Subsequent requests can join from workshops
-   into profiles to display the instructor's name.
+4. If Supabase returns a session (no email-confirm delay):
+       │
+       │   POST /functions/v1/register-user-profile
+       │   Headers: Authorization: Bearer <access_token>, apikey: <anon key>
+       │   Body: full_name, user_type, bio, and for instructors:
+       │         primary_location (GeoJSON Point [lng,lat]), city, country,
+       │         optional address_line, state — see Edge function source.
+       ▼
+5. Profile row is updated with location fields for instructors.
+   If there is no session after signUp (email confirmation required),
+   this POST cannot run yet; the UI tells instructors to set location
+   after first sign-in (follow-up profile UI TBD).
 ```
+
+### Instructor primary location (Google Places)
+
+- **UI:** [`src/components/auth/PrimaryLocationField.tsx`](thayya-app/src/components/auth/PrimaryLocationField.tsx) — loaded only on signup when “Instructor” is selected (`next/dynamic`, `ssr: false`). Uses `@googlemaps/js-api-loader` (`setOptions` + `importLibrary("places")`) and Places **Autocomplete** with `componentRestrictions: { country: "in" }`.
+- **Parsing:** [`src/lib/primary-location.ts`](thayya-app/src/lib/primary-location.ts) maps `address_components` → `city` / `country` / `state` / `address_line` and builds GeoJSON for PostGIS.
+- **Env:** `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — restrict in Google Cloud Console (HTTP referrers + enable **Places API** / Maps JavaScript API as needed for billing).
+- **Edge:** [`supabase/functions/register-user-profile/index.ts`](thayya-app/supabase/functions/register-user-profile/index.ts) — must be deployed; app calls it via [`src/lib/register-user-profile.ts`](thayya-app/src/lib/register-user-profile.ts) using `NEXT_PUBLIC_SUPABASE_URL` + anon key.
+
+### Member browsing location (discover)
+
+- **Who:** Signed-in users with `profiles.user_type = member` on `(site)` routes.
+- **Flow:** [`MemberViewerLocationProvider`](thayya-app/src/contexts/member-viewer-location-context.tsx) requests **device geolocation** once when no saved preference exists; on failure, a modal requires **Coimbatore** or **Bangalore** (fixed lat/lng). The header tagline (right column) shows `Dance fitness · {label}` and opens the same picker when clicked.
+- **API:** [`fetchDiscoverInstructorsBrowser`](thayya-app/src/lib/discover-instructors-browser.ts) calls `GET /functions/v1/discover-instructors?lat=&lng=` (anon `apikey` + `Authorization` bearer anon), matching [`supabase/functions/discover-instructors/index.ts`](thayya-app/supabase/functions/discover-instructors/index.ts).
+- **Persistence:** Browser **`localStorage`** (`thayya_member_viewer_location_v1` in [`member-viewer-location-storage.ts`](thayya-app/src/lib/member-viewer-location-storage.ts)) plus React context — **not** Redux/redux-persist (keeps the stack small; preference is UX-only until we optionally sync to `profiles`).
+- **Discover page:** For members, [`member/discover/page.tsx`](thayya-app/src/app/(site)/member/discover/page.tsx) renders [`DiscoverInstructorsMemberClient`](thayya-app/src/components/site/elements/discover-instructors-member-client.tsx) instead of the server-only instructor list.
 
 ### Why a `profiles` table at all?
 We could have used only `auth.users.raw_user_meta_data`, but:
@@ -295,6 +326,8 @@ and skip the rest. Add columns to `profiles` when you want them:
 
 | Date | Decision | Why |
 | --- | --- | --- |
+| 2026-05-13 | Member browsing location: geolocation or city preset, persisted in `localStorage`, drives `discover-instructors?lat=&lng=` and dynamic site header for members. | Nearby instructor ranking without adding Redux; optional future sync to `profiles`. |
+| 2026-05-13 | Instructor signup collects primary location (Google Places, India-biased) and calls `register-user-profile` when a session exists immediately after `signUp`. | Persists `primary_location` / address fields required by the Edge function and PostGIS; defers when email confirmation blocks session. |
 | 2026-05-13 | Split the old single-file marketing home into real routes under `app/(site)/` with a shared layout; portal links filtered by `profiles.user_type`. | Shareable URLs, SSR for discover data, global header/footer, no fake role switcher. |
 | 2026-05-12 | Use a `profiles` table backed by `auth.users` rather than only `user_metadata`. | Need a real FK target for `workshops.instructor_id`, easier RLS, easier joins. |
 | 2026-05-12 | `handle_new_user` trigger creates the profile row at signup time. | Atomic with auth.users; works even when email confirmation defers session. Considered moving to app-side `ensureProfile()` but the trigger costs less complexity overall. |

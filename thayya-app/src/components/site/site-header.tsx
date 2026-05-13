@@ -8,6 +8,8 @@ import type { PortalId } from "@/lib/site-portals";
 import { portalHomeHref, portalLabel } from "@/lib/site-portals";
 import { supabase } from "@/app/supabaseClient";
 
+import { useMemberViewerLocation } from "@/contexts/member-viewer-location-context";
+
 export type SiteHeaderProps = {
   allowedPortals: PortalId[];
   userEmail: string | null;
@@ -16,6 +18,7 @@ export type SiteHeaderProps = {
 
 export function SiteHeader({ allowedPortals, userEmail, isAuthenticated }: SiteHeaderProps) {
   const pathname = usePathname();
+  const { isMember, headerTaglineRight, openPicker } = useMemberViewerLocation();
   const activePortal: PortalId | null = pathname.startsWith("/admin")
     ? "admin"
     : pathname.startsWith("/instructor")
@@ -44,7 +47,7 @@ export function SiteHeader({ allowedPortals, userEmail, isAuthenticated }: SiteH
         <div className="flex items-center gap-3">
           <Link href="/member/discover" className="flex shrink-0 items-center">
             <Image
-              src="/Logo.jpg"
+              src="/Logo.png"
               alt="Thayya Official Logo"
               width={160}
               height={40}
@@ -122,12 +125,24 @@ export function SiteHeader({ allowedPortals, userEmail, isAuthenticated }: SiteH
         >
           Move · Rise · Shine
         </div>
-        <div
-          className="text-[10px] uppercase tracking-wider md:text-[11px]"
-          style={{ color: "var(--ink-muted)" }}
-        >
-          Dance fitness · Bangalore
-        </div>
+        {isMember ? (
+          <button
+            type="button"
+            onClick={openPicker}
+            className="max-w-[min(100%,14rem)] cursor-pointer truncate text-left text-[10px] uppercase tracking-wider underline-offset-2 hover:underline md:max-w-none md:text-[11px]"
+            style={{ color: "var(--ink-muted)" }}
+            title="Change your browsing area"
+          >
+            {headerTaglineRight}
+          </button>
+        ) : (
+          <div
+            className="text-[10px] uppercase tracking-wider md:text-[11px]"
+            style={{ color: "var(--ink-muted)" }}
+          >
+            Dance fitness · India
+          </div>
+        )}
       </div>
     </header>
   );

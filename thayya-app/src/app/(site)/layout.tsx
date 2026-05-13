@@ -1,5 +1,6 @@
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { SiteHeader } from "@/components/site/site-header";
+import { MemberViewerLocationProvider } from "@/contexts/member-viewer-location-context";
 import { allowedPortalsForUser } from "@/lib/site-portals";
 import { getProfileById } from "@/lib/profile";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -14,12 +15,17 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="min-h-screen">
-      <SiteHeader
-        allowedPortals={allowedPortals}
-        userEmail={user?.email ?? null}
+      <MemberViewerLocationProvider
+        userType={profile?.user_type ?? null}
         isAuthenticated={!!user}
-      />
-      {children}
+      >
+        <SiteHeader
+          allowedPortals={allowedPortals}
+          userEmail={user?.email ?? null}
+          isAuthenticated={!!user}
+        />
+        {children}
+      </MemberViewerLocationProvider>
       <SiteFooter />
     </div>
   );

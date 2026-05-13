@@ -1,10 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, User as UserIcon } from "lucide-react";
 import { supabase } from "@/app/supabaseClient";
+import { registerUserProfile } from "@/lib/register-user-profile";
+
+const PrimaryLocationField = dynamic(
+  () =>
+    import("@/components/auth/PrimaryLocationField").then((mod) => ({
+      default: mod.PrimaryLocationField,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="text-xs text-muted-foreground">Loading location search…</p>
+    ),
+  },
+);
 
 function safeNextPath(next) {
   if (!next || typeof next !== "string") return "/";
@@ -39,6 +54,7 @@ export function AuthForm() {
   const [fullName, setFullName] = useState("");
   const [userType, setUserType] = useState("member");
   const [bio, setBio] = useState("");
+  const [instructorLocation, setInstructorLocation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [formMessage, setFormMessage] = useState("");
@@ -47,6 +63,7 @@ export function AuthForm() {
     setMode(nextMode);
     setFormError("");
     setFormMessage("");
+    setInstructorLocation(null);
   };
 
   const handleSubmit = async (e) => {
@@ -80,6 +97,14 @@ export function AuthForm() {
         throw new Error(`Bio must be ${BIO_MAX_LENGTH} characters or fewer.`);
       }
 
+      if (userType === "instructor") {
+        if (!instructorLocation) {
+          throw new Error(
+            "Please choose your primary location of operation from the suggestions (with city and country)."
+          );
+        }
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -98,12 +123,38 @@ export function AuthForm() {
       if (error) throw error;
 
       if (data?.session) {
+        const token = data.session.access_token;
+        const bioPayload = trimmedBio || null;
+        if (userType === "instructor") {
+          await registerUserProfile(token, {
+            full_name: trimmedName,
+            user_type: "instructor",
+            bio: bioPayload,
+            primary_location: instructorLocation.primary_location,
+            city: instructorLocation.city,
+            country: instructorLocation.country,
+            address_line: instructorLocation.address_line,
+            state: instructorLocation.state,
+          });
+        } else {
+          await registerUserProfile(token, {
+            full_name: trimmedName,
+            user_type: "member",
+            bio: bioPayload,
+          });
+        }
         router.push(safeNextPath(searchParams.get("next")));
         router.refresh();
         return;
       }
 
-      setFormMessage("Signup successful. Please check your email to confirm.");
+      if (userType === "instructor") {
+        setFormMessage(
+          "Signup successful. Please check your email to confirm your account. After you sign in, set your primary teaching location from your profile (required for instructors) — it could not be saved until your email is confirmed."
+        );
+      } else {
+        setFormMessage("Signup successful. Please check your email to confirm.");
+      }
     } catch (error) {
       const message = error?.message || "Something went wrong. Please try again.";
       if (message.includes("Invalid path specified in request URL")) {
@@ -125,7 +176,7 @@ export function AuthForm() {
     <div className="w-full max-w-md mx-auto">
       <div className="flex justify-center mb-10">
         <Image
-          src="/Logo.jpg"
+          src="/Logo.png"
           alt="Thayya - Move. Rise. Shine."
           width={220}
           height={140}
@@ -211,7 +262,10 @@ export function AuthForm() {
                         type="button"
                         role="radio"
                         aria-checked={isSelected}
-                        onClick={() => setUserType(type.id)}
+                        onClick={() => {
+                          setUserType(type.id);
+                          if (type.id === "member") setInstructorLocation(null);
+                        }}
                         className={`text-left rounded-xl border px-4 py-3 transition-all focus:outline-none focus:ring-2 focus:ring-ring ${
                           isSelected
                             ? "border-primary bg-primary/5 text-foreground"
@@ -227,6 +281,10 @@ export function AuthForm() {
                   })}
                 </div>
               </fieldset>
+
+              {userType === "instructor" ? (
+                <PrimaryLocationField onChange={setInstructorLocation} disabled={isLoading} />
+              ) : null}
             </>
           )}
 
