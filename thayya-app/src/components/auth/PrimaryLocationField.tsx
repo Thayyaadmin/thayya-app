@@ -9,6 +9,10 @@ export type { PrimaryLocationPayload };
 type PrimaryLocationFieldProps = {
   onChange: (payload: PrimaryLocationPayload | null) => void;
   disabled?: boolean;
+  /** Override default instructor signup copy (e.g. workshop venue). */
+  label?: string;
+  description?: string;
+  inputId?: string;
 };
 
 type PlacesAutocompleteCtor = new (
@@ -38,7 +42,17 @@ function ensureMapsOptions() {
 /**
  * Google Places Autocomplete for instructor primary operating location.
  */
-export function PrimaryLocationField({ onChange, disabled }: PrimaryLocationFieldProps) {
+const DEFAULT_LABEL = "Primary location of operation";
+const DEFAULT_DESCRIPTION =
+  "Search for your studio or main teaching area. We use this to show you on the map. (India addresses.)";
+
+export function PrimaryLocationField({
+  onChange,
+  disabled,
+  label = DEFAULT_LABEL,
+  description = DEFAULT_DESCRIPTION,
+  inputId = "primaryLocation",
+}: PrimaryLocationFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   /** Google `Autocomplete` instance — typed loosely so we do not require global `google` types at compile time. */
   const acRef = useRef<{ addListener: (name: string, fn: () => void) => void; getPlace: () => unknown } | null>(
@@ -116,16 +130,13 @@ export function PrimaryLocationField({ onChange, disabled }: PrimaryLocationFiel
 
   return (
     <div className="space-y-2">
-      <label htmlFor="primaryLocation" className="text-sm font-medium text-foreground">
-        Primary location of operation
+      <label htmlFor={inputId} className="text-sm font-medium text-foreground">
+        {label}
       </label>
-      <p className="text-xs text-muted-foreground leading-relaxed">
-        Search for your studio or main teaching area. We use this to show you on the map. (India
-        addresses.)
-      </p>
+      <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
       <input
         ref={inputRef}
-        id="primaryLocation"
+        id={inputId}
         type="text"
         autoComplete="off"
         disabled={disabled}

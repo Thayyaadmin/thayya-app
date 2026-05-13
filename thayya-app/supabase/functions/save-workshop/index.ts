@@ -145,7 +145,8 @@ Deno.serve(async (req: Request) => {
     price = p;
   }
 
-  const location = parseGeoPoint(body.location ?? null);
+  const locationSent = Object.prototype.hasOwnProperty.call(body, "location");
+  const location = locationSent ? parseGeoPoint(body.location ?? null) : null;
 
   const address_line = optionalTrimmedText(body.address_line);
   const city = optionalTrimmedText(body.city);
@@ -227,8 +228,11 @@ Deno.serve(async (req: Request) => {
       date,
       price,
       slots,
-      location,
     };
+
+    if (locationSent) {
+      patch.location = location;
+    }
 
     for (const key of ["address_line", "city", "state", "country"] as const) {
       const v = textFieldForPatch(body, key);
@@ -310,7 +314,7 @@ Deno.serve(async (req: Request) => {
     instructor_id: instructorId,
     instructor: instructorName,
     slots,
-    location,
+    location: locationSent ? location : null,
     address_line,
     city,
     state,

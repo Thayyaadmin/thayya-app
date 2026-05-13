@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search, Pencil, Trash2 } from "lucide-react"
 import { supabase } from "@/app/supabaseClient"
 import { deleteWorkshop } from "@/app/dashboard/workshops/actions"
+import { toGeoJsonPoint } from "@/lib/geo-point"
 
 export type WorkshopStatus = "active" | "upcoming" | "completed"
 
@@ -29,6 +30,13 @@ export type WorkshopRow = {
   dateIso: string | null
   status: WorkshopStatus
   price: number | null
+  slots: number
+  address_line: string | null
+  city: string | null
+  state: string | null
+  country: string | null
+  /** JSON string of `{ type: "Point", coordinates: [lng, lat] }` for the save-workshop form. */
+  locationGeoJson: string | null
 }
 
 function formatWorkshopDateDisplay(dateValue: string | null): string {
@@ -88,6 +96,22 @@ function mapDbRowToWorkshop(row: Record<string, unknown>): WorkshopRow | null {
     price = Number.isFinite(n) ? n : null
   }
 
+  const rawSlots = row.slots
+  let slots = 20
+  if (rawSlots !== null && rawSlots !== undefined && rawSlots !== "") {
+    const n = typeof rawSlots === "number" ? rawSlots : Number(rawSlots)
+    if (Number.isInteger(n) && n >= 1) slots = n
+  }
+
+  const address_line =
+    row.address_line != null && String(row.address_line).trim() ? String(row.address_line).trim() : null
+  const city = row.city != null && String(row.city).trim() ? String(row.city).trim() : null
+  const state = row.state != null && String(row.state).trim() ? String(row.state).trim() : null
+  const country = row.country != null && String(row.country).trim() ? String(row.country).trim() : null
+
+  const geo = toGeoJsonPoint(row.location)
+  const locationGeoJson = geo ? JSON.stringify(geo) : null
+
   return {
     id: String(row.id),
     name: title,
@@ -96,6 +120,12 @@ function mapDbRowToWorkshop(row: Record<string, unknown>): WorkshopRow | null {
     dateIso,
     status: deriveStatus(dateIso),
     price,
+    slots,
+    address_line,
+    city,
+    state,
+    country,
+    locationGeoJson,
   }
 }
 
