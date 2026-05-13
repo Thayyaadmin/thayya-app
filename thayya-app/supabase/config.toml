@@ -1,0 +1,9 @@
+# Minimal config so `supabase functions serve|deploy` can find the project.
+# Run `supabase init` locally if you need full local stack defaults.
+
+project_id = "thayya-app"
+
+# Public read-only endpoint: no Supabase Auth JWT required.
+# Secured by only returning workshop fields you select in code; DB access uses the service role (secret).
+[functions.workshops-upcoming]
+verify_jwt = false

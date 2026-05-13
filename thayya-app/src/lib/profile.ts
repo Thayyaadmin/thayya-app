@@ -7,11 +7,26 @@ export interface Profile {
   user_type: UserType;
   full_name: string;
   bio: string | null;
+  slug: string | null;
   created_at: string;
   updated_at: string;
 }
 
-const PROFILE_COLUMNS = "id, user_type, full_name, bio, created_at, updated_at";
+const PROFILE_COLUMNS = "id, user_type, full_name, bio, slug, created_at, updated_at";
+
+/**
+ * Convert a display name to a URL-safe slug. Mirrors the regex used by
+ * `handle_new_user()` in `supabase/profiles-slug.sql` so app and DB stay
+ * in sync. Does NOT handle collisions — that's the DB's job at insert.
+ */
+export function slugifyName(name: string): string {
+  return name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
 /**
  * Load a profile row by user id. Returns null when the row does not exist yet
@@ -25,6 +40,27 @@ export async function getProfileById(
     .from("profiles")
     .select(PROFILE_COLUMNS)
     .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw error;
+  }
+
+  return (data as Profile | null) ?? null;
+}
+
+/** Look up a profile by its URL slug. Returns null if not found. */
+export async function getProfileBySlug(
+  client: SupabaseClient,
+  slug: string,
+): Promise<Profile | null> {
+  if (!slug) return null;
+
+  const { data, error } = await client
+    .from("profiles")
+    .select(PROFILE_COLUMNS)
+    .eq("slug", slug)
     .maybeSingle();
 
   if (error) {

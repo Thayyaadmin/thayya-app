@@ -13,6 +13,9 @@ export default function ThayyaPlatform() {
   const [isLoadingWorkshops, setIsLoadingWorkshops] = useState(true);
   const [workshopsError, setWorkshopsError] = useState('');
   const [user, setUser] = useState(null);
+  const [instructors, setInstructors] = useState([]);
+  const [isLoadingInstructors, setIsLoadingInstructors] = useState(true);
+  const [instructorsError, setInstructorsError] = useState('');
 
   useEffect(() => {
     const fetchCurrentUser = async () => {
@@ -51,6 +54,34 @@ export default function ThayyaPlatform() {
     };
     fetchWorkshops();
   }, []);
+
+  useEffect(() => {
+    const fetchInstructors = async () => {
+      setIsLoadingInstructors(true);
+      setInstructorsError('');
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, slug, bio, user_type')
+        .eq('user_type', 'instructor')
+        .not('slug', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(8);
+
+      if (error) {
+        setInstructors([]);
+        setInstructorsError(error.message || 'Unable to fetch instructors.');
+        console.error('Error fetching instructors:', error);
+        setIsLoadingInstructors(false);
+        return;
+      }
+
+      setInstructors(Array.isArray(data) ? data : []);
+      setIsLoadingInstructors(false);
+    };
+    fetchInstructors();
+  }, []);
+
   const switchRole = (newRole) => {
     setRole(newRole);
     if (newRole === 'member') setCheckoutStep(1);
@@ -72,6 +103,21 @@ export default function ThayyaPlatform() {
   const formatWorkshopPrice = (priceValue) => {
     if (priceValue === null || priceValue === undefined || priceValue === '') return 'Price unavailable';
     return typeof priceValue === 'number' ? `₹${priceValue}` : String(priceValue);
+  };
+  const getInitials = (name) => {
+    const trimmed = (name || '').trim();
+    if (!trimmed) return '?';
+    const parts = trimmed.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+    }
+    return trimmed.slice(0, 2).toUpperCase();
+  };
+  const avatarVariant = (id) => {
+    const s = String(id || '');
+    let hash = 0;
+    for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) | 0;
+    return (Math.abs(hash) % 4) + 1;
   };
   const userEmail = user?.email || 'User account';
   const handleSignOut = async () => {
@@ -165,7 +211,6 @@ export default function ThayyaPlatform() {
             <div className="max-w-[1400px] mx-auto px-4 md:px-6 overflow-x-auto scrollbar-hide">
               <div className="flex gap-1 py-2 min-w-max">
                 <NavPill label="Discover" targetPage="discover" />
-                <NavPill label="Instructor Page" targetPage="instructor" />
                 <NavPill label="Book Workshop" targetPage="book" />
                 <NavPill label="My Bookings" targetPage="bookings" />
                 <NavPill label="Membership" targetPage="membership" />
@@ -194,32 +239,50 @@ export default function ThayyaPlatform() {
               <div className="mb-12">
                 <div className="flex items-end justify-between mb-6">
                   <div>
-                    <div className="text-[10px] tracking-[0.25em] uppercase mb-1 font-semibold" style={{ color: 'var(--ink-muted)' }}>Featured · April</div>
+                    <div className="text-[10px] tracking-[0.25em] uppercase mb-1 font-semibold" style={{ color: 'var(--ink-muted)' }}>Featured · This month</div>
                     <h2 className="font-display text-2xl md:text-3xl font-bold">Instructors near you</h2>
                   </div>
-                  <button className="text-sm font-semibold flex items-center gap-1" style={{ color: 'var(--t-magenta)' }}>View all <ArrowRight className="w-4 h-4" /></button>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                  {[
-                    { av: 'av-1', tag: 'Bollywood', ini: 'AK', rating: '4.9', loc: 'Bangalore', name: 'Anaya Krishnan', style: 'Bharatanatyam Fusion' },
-                    { av: 'av-2', tag: 'Cardio', ini: 'RM', rating: '4.8', loc: 'Mumbai', name: 'Rohan Mehta', style: 'Bombay Bounce' },
-                    { av: 'av-3', tag: 'Classical', ini: 'PN', rating: '5.0', loc: 'Chennai', name: 'Priya Nair', style: 'Mohiniyattam Flow' },
-                    { av: 'av-4', tag: 'HIIT', ini: 'KI', rating: '4.7', loc: 'Pune', name: 'Karthik Iyer', style: 'Kuchipudi HIIT' }
-                  ].map((inst, i) => (
-                    <button key={i} onClick={() => showPage('member','instructor')} className="text-left lift">
-                      <div className={`aspect-[3/4] rounded-2xl mb-3 relative overflow-hidden ${inst.av} grain`}>
-                        <span className="absolute top-3 left-3 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-white/25 backdrop-blur text-white">{inst.tag}</span>
-                        <div className="absolute inset-0 flex items-center justify-center"><span className="font-display text-6xl font-bold text-white/95">{inst.ini}</span></div>
-                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs font-medium">
-                          <span className="flex items-center gap-1"><Star className="w-3 h-3 fill-white" />{inst.rating}</span>
-                          <span>{inst.loc}</span>
-                        </div>
-                      </div>
-                      <div className="font-display text-base md:text-lg font-bold">{inst.name}</div>
-                      <div className="text-xs" style={{ color: 'var(--ink-muted)' }}>{inst.style}</div>
-                    </button>
-                  ))}
-                </div>
+                {instructorsError && (
+                  <p className="text-sm mb-3" style={{ color: 'var(--t-red)' }}>
+                    Could not load instructors: {instructorsError}
+                  </p>
+                )}
+                {isLoadingInstructors ? (
+                  <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>Loading instructors...</p>
+                ) : instructors.length === 0 ? (
+                  <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
+                    No instructors are on Thayya yet. Sign up as an instructor to be the first.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                    {instructors.map((inst) => {
+                      const variant = avatarVariant(inst.id);
+                      const initials = getInitials(inst.full_name);
+                      return (
+                        <button
+                          key={inst.id}
+                          type="button"
+                          onClick={() => inst.slug && router.push(`/instructors/${inst.slug}`)}
+                          disabled={!inst.slug}
+                          className="text-left lift disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <div className={`aspect-[3/4] rounded-2xl mb-3 relative overflow-hidden av-${variant} grain`}>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="font-display text-6xl font-bold text-white/95">{initials}</span>
+                            </div>
+                          </div>
+                          <div className="font-display text-base md:text-lg font-bold">{inst.full_name || 'Instructor'}</div>
+                          {inst.bio ? (
+                            <div className="text-xs line-clamp-2" style={{ color: 'var(--ink-muted)' }}>
+                              {inst.bio}
+                            </div>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -261,56 +324,6 @@ export default function ThayyaPlatform() {
                     </p>
                   )}
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* INSTRUCTOR PROFILE */}
-          {pages.member === 'instructor' && (
-            <div className="page max-w-[1200px] mx-auto px-4 md:px-8 py-8 md:py-12">
-              <button onClick={() => showPage('member','discover')} className="flex items-center gap-1 text-sm mb-6" style={{ color: 'var(--ink-soft)' }}><ChevronLeft className="w-4 h-4" /> Back</button>
-              <div className="grid md:grid-cols-3 gap-8 md:gap-10 items-start mb-12">
-                <div className="aspect-square rounded-3xl av-1 grain relative max-w-[320px] mx-auto md:mx-0">
-                  <div className="w-full h-full flex items-center justify-center font-display text-7xl md:text-8xl font-bold text-white/95">AK</div>
-                  <div className="absolute bottom-4 right-4 px-3 py-1 rounded-full bg-white/90 backdrop-blur text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                    <BadgeCheck className="w-3 h-3" style={{ color: 'var(--t-magenta)' }} /> Certified
-                  </div>
-                </div>
-                <div className="md:col-span-2">
-                  <div className="text-[11px] tracking-[0.25em] uppercase mb-3 font-semibold" style={{ color: 'var(--ink-muted)' }}>Bangalore · Bharatanatyam Fusion</div>
-                  <h1 className="font-display text-4xl md:text-6xl font-bold mb-4 leading-[1.05]">Anaya <span className="gradient-text">Krishnan</span></h1>
-                  <p className="text-base mb-6 leading-relaxed" style={{ color: 'var(--ink-soft)' }}>Twelve years of classical training meets the joy of a Friday-night dance floor. I teach in English, Tamil, and Hindi — bring your energy, leave with your tribe.</p>
-                  <div className="flex flex-wrap items-center gap-4 text-sm mb-6">
-                    <span className="flex items-center gap-1 font-semibold"><Star className="w-4 h-4 fill-current" style={{ color: 'var(--t-orange)' }} /> 4.9 · 142 reviews</span>
-                    <span style={{ color: 'var(--ink-muted)' }}>·</span>
-                    <span className="font-semibold">1,400+ students taught</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button className="gradient-bg-warm text-white px-5 py-2.5 rounded-full text-sm font-bold">Follow</button>
-                    <button className="px-5 py-2.5 rounded-full text-sm font-bold border" style={{ borderColor: 'var(--line)', background: 'white' }}>Refer a friend</button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <div className="text-[10px] tracking-[0.25em] uppercase mb-1 font-semibold" style={{ color: 'var(--ink-muted)' }}>Schedule</div>
-                <h2 className="font-display text-2xl md:text-3xl font-bold">Upcoming workshops</h2>
-              </div>
-              <div className="grid md:grid-cols-3 gap-3">
-                {[
-                  { title: 'Bollywood Cardio', time: 'Mon 27 Apr · 6:30 PM', price: '₹450', spots: '7 spots', color: 'var(--t-red)', style: { background: 'white', border: '1px solid var(--line)' } },
-                  { title: 'Aaja Nachle Intensive', time: 'Wed 29 Apr · 7:00 PM', price: '₹600', spots: '3 spots · almost full', color: 'var(--t-red)', style: { background: 'white' }, classes: 'gradient-border' },
-                  { title: 'Saturday Morning Flow', time: 'Sat 02 May · 8:00 AM', price: '₹350', spots: '22 spots', color: 'var(--t-teal)', style: { background: 'white', border: '1px solid var(--line)' } }
-                ].map((ws, i) => (
-                  <button key={i} onClick={() => showPage('member','book')} className={`lift text-left p-5 rounded-2xl ${ws.classes || ''}`} style={ws.style}>
-                    <div className="font-display text-lg font-bold mb-1">{ws.title}</div>
-                    <div className="text-xs mb-4" style={{ color: 'var(--ink-muted)' }}>{ws.time}</div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-display text-xl font-bold gradient-text">{ws.price}</span>
-                      <span className="text-xs font-semibold" style={{ color: ws.color }}>{ws.spots}</span>
-                    </div>
-                  </button>
-                ))}
               </div>
             </div>
           )}
