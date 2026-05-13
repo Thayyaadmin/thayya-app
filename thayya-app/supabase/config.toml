@@ -3,8 +3,7 @@
 
 project_id = "thayya-app"
 
-# Public read-only endpoint: no Supabase Auth JWT required.
-# Secured by only returning workshop fields you select in code; DB access uses the service role (secret).
+# Public read-only: upcoming workshops (bounded); service role in function.
 [functions.workshops-upcoming]
 verify_jwt = false
 

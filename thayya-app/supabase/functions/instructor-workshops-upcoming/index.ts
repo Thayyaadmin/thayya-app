@@ -7,6 +7,9 @@ import {
 
 const LOG = "instructor-workshops-upcoming";
 
+/** Same base columns as shared gate, plus profile join for dashboard display. */
+const SELECT_WITH_PROFILE = `${SELECT_COLS}, instructor_profile:profiles!instructor_id(id, full_name, user_type)`;
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -27,7 +30,7 @@ Deno.serve(async (req: Request) => {
 
   const { data, error } = await admin
     .from("workshops")
-    .select(SELECT_COLS)
+    .select(SELECT_WITH_PROFILE)
     .eq("instructor_id", user.id)
     .or(`date.is.null,date.gte.${nowIso}`)
     .order("date", { ascending: true, nullsFirst: false })

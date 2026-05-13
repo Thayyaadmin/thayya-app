@@ -17,6 +17,7 @@ import { Search, Pencil, Trash2 } from "lucide-react"
 import { supabase } from "@/app/supabaseClient"
 import { deleteWorkshop } from "@/app/dashboard/workshops/actions"
 import { toGeoJsonPoint } from "@/lib/geo-point"
+import { fetchInstructorWorkshopsUpcoming } from "@/lib/instructor-workshops-upcoming-browser"
 
 export type WorkshopStatus = "active" | "upcoming" | "completed"
 
@@ -156,19 +157,27 @@ export function WorkshopsTable({ refreshToken = 0, onEdit }: WorkshopsTableProps
     setLoading(true)
     setLoadError(null)
 
-    const { data, error } = await supabase
-      .from("workshops")
-      .select("*, instructor_profile:profiles!instructor_id(id, full_name, user_type)")
-
-    if (error) {
-      console.error("Workshops fetch error:", error)
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    if (!session?.access_token) {
       setWorkshops([])
-      setLoadError(error.message || "Could not load workshops.")
+      setLoadError("You must be signed in to view your workshops.")
       setLoading(false)
       return
     }
 
-    const rows = (Array.isArray(data) ? data : [])
+    const { workshops: data, error } = await fetchInstructorWorkshopsUpcoming(session.access_token)
+
+    if (error) {
+      console.error("Workshops fetch error:", error)
+      setWorkshops([])
+      setLoadError(error)
+      setLoading(false)
+      return
+    }
+
+    const rows = data
       .map((r) => mapDbRowToWorkshop(r as Record<string, unknown>))
       .filter((r): r is WorkshopRow => r !== null)
 
@@ -222,9 +231,14 @@ export function WorkshopsTable({ refreshToken = 0, onEdit }: WorkshopsTableProps
 
   return (
     <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
-      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <CardTitle className="text-lg font-semibold">Current Workshops</CardTitle>
-        <div className="relative w-full sm:w-72">
+      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1 space-y-1">
+          <CardTitle className="text-lg font-semibold">Your upcoming workshops</CardTitle>
+          <p className="text-muted-foreground text-sm">
+            Only workshops you lead, dated today or later (or with no date yet). Past runs are not listed here.
+          </p>
+        </div>
+        <div className="relative w-full sm:w-72 sm:shrink-0">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search workshops..."
