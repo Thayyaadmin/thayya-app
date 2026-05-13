@@ -1,7 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
-const WORKSHOP_SELECT =
-  "*, instructor_profile:profiles!instructor_id(id, full_name, user_type)";
+import { getSupabaseEnv } from "@/lib/supabase-env";
 
 export type DiscoverWorkshopRow = {
   id: string;
@@ -25,35 +22,126 @@ export type DiscoverInstructorRow = {
   user_type: string;
 };
 
-export async function fetchDiscoverWorkshops(
-  supabase: SupabaseClient,
-): Promise<{ data: DiscoverWorkshopRow[]; error: string | null }> {
-  const { data, error } = await supabase
-    .from("workshops")
-    .select(WORKSHOP_SELECT);
+export type FetchDiscoverInstructorsOptions = {
+  /** WGS-84 latitude; if set, `lng` must also be set. Edge filters within 20 km (haversine). */
+  lat?: number;
+  lng?: number;
+};
 
-  if (error) {
-    return { data: [], error: error.message || "Unable to fetch workshops." };
+export type FetchDiscoverWorkshopsOptions = {
+  /** WGS-84; both set → Edge returns workshops within 20 km of workshop `location` (haversine). */
+  lat?: number;
+  lng?: number;
+};
+
+/**
+ * Loads workshops via the **discover-workshops** Edge Function (same row shape as before).
+ */
+export async function fetchDiscoverWorkshops(
+  options: FetchDiscoverWorkshopsOptions = {},
+): Promise<{ data: DiscoverWorkshopRow[]; error: string | null }> {
+  try {
+    const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv();
+    const params = new URLSearchParams();
+    const { lat, lng } = options;
+    if (
+      lat !== undefined &&
+      lng !== undefined &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lng)
+    ) {
+      params.set("lat", String(lat));
+      params.set("lng", String(lng));
+    }
+    const qs = params.toString();
+    const endpoint = `${supabaseUrl}/functions/v1/discover-workshops${qs ? `?${qs}` : ""}`;
+    const res = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+      },
+      next: { revalidate: 60 },
+    });
+
+    const payload = (await res.json()) as {
+      workshops?: DiscoverWorkshopRow[];
+      error?: string;
+    };
+
+    if (!res.ok) {
+      return {
+        data: [],
+        error: payload.error || res.statusText || "Unable to fetch workshops.",
+      };
+    }
+
+    const list = payload.workshops;
+    return {
+      data: Array.isArray(list) ? list : [],
+      error: null,
+    };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Unable to fetch workshops.";
+    return { data: [], error: message };
   }
-  return { data: Array.isArray(data) ? (data as DiscoverWorkshopRow[]) : [], error: null };
 }
 
+/**
+ * Loads instructor cards via the **discover-instructors** Edge Function.
+ * With `lat` + `lng`, the function returns instructors within **20 km** (haversine on
+ * `primary_location`) who have a public slug. Without coordinates, returns featured
+ * instructors (latest eight with slug).
+ */
 export async function fetchDiscoverInstructors(
-  supabase: SupabaseClient,
-): Promise<{ data: DiscoverInstructorRow[]; error: string | null }> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, full_name, slug, bio, user_type")
-    .eq("user_type", "instructor")
-    .not("slug", "is", null)
-    .order("created_at", { ascending: false })
-    .limit(8);
+  options: FetchDiscoverInstructorsOptions = {},
+): Promise<{
+  data: DiscoverInstructorRow[];
+  error: string | null;
+}> {
+  try {
+    const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv();
+    const params = new URLSearchParams();
+    const { lat, lng } = options;
+    if (
+      lat !== undefined &&
+      lng !== undefined &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lng)
+    ) {
+      params.set("lat", String(lat));
+      params.set("lng", String(lng));
+    }
+    const qs = params.toString();
+    const endpoint = `${supabaseUrl}/functions/v1/discover-instructors${qs ? `?${qs}` : ""}`;
+    const res = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+      },
+      next: { revalidate: 60 },
+    });
 
-  if (error) {
-    return { data: [], error: error.message || "Unable to fetch instructors." };
+    const payload = (await res.json()) as {
+      instructors?: DiscoverInstructorRow[];
+      error?: string;
+    };
+
+    if (!res.ok) {
+      return {
+        data: [],
+        error: payload.error || res.statusText || "Unable to fetch instructors.",
+      };
+    }
+
+    const list = payload.instructors;
+    return {
+      data: Array.isArray(list) ? list : [],
+      error: null,
+    };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Unable to fetch instructors.";
+    return { data: [], error: message };
   }
-  return {
-    data: Array.isArray(data) ? (data as DiscoverInstructorRow[]) : [],
-    error: null,
-  };
 }
