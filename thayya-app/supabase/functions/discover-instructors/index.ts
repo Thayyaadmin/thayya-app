@@ -16,6 +16,7 @@ type InstructorRow = {
   slug: string | null;
   bio: string | null;
   user_type: string;
+  avatar_url: string | null;
 };
 
 type ProfileWithPin = InstructorRow & { primary_location?: unknown };
@@ -104,7 +105,7 @@ Deno.serve(async (req: Request) => {
   if (viewer) {
     const { data, error } = await admin
       .from("profiles")
-      .select("id, full_name, slug, bio, user_type, primary_location")
+      .select("id, full_name, slug, bio, user_type, avatar_url, primary_location")
       .eq("user_type", "instructor")
       .not("slug", "is", null)
       .not("primary_location", "is", null)
@@ -137,6 +138,7 @@ Deno.serve(async (req: Request) => {
       slug: row.slug,
       bio: row.bio,
       user_type: row.user_type,
+      avatar_url: row.avatar_url ?? null,
     }));
 
     return Response.json(
@@ -151,7 +153,7 @@ Deno.serve(async (req: Request) => {
 
   const { data, error } = await admin
     .from("profiles")
-    .select("id, full_name, slug, bio, user_type")
+    .select("id, full_name, slug, bio, user_type, avatar_url")
     .eq("user_type", "instructor")
     .not("slug", "is", null)
     .order("created_at", { ascending: false })

@@ -8,11 +8,13 @@ export interface Profile {
   full_name: string;
   bio: string | null;
   slug: string | null;
+  avatar_url: string | null;
   created_at: string;
   updated_at: string;
 }
 
-const PROFILE_COLUMNS = "id, user_type, full_name, bio, slug, created_at, updated_at";
+const PROFILE_COLUMNS =
+  "id, user_type, full_name, bio, slug, avatar_url, created_at, updated_at";
 
 /**
  * Convert a display name to a URL-safe slug. Mirrors the regex used by

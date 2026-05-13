@@ -20,6 +20,10 @@ verify_jwt = false
 [functions.register-user-profile]
 verify_jwt = true
 
+# Session JWT; multipart image body uploaded to R2, then profiles.avatar_url updated.
+[functions.upload-profile-avatar]
+verify_jwt = true
+
 # Instructor/admin create/update workshop; validates JWT then writes with service role.
 [functions.save-workshop]
 verify_jwt = true
