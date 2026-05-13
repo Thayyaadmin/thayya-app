@@ -28,6 +28,10 @@ verify_jwt = true
 [functions.save-workshop]
 verify_jwt = true
 
-# JWT: workshops where instructor_id = auth.uid(), upcoming first (then undated, then past).
-[functions.instructor-workshops]
+# JWT: instructor_id = auth.uid(); date null or date >= now; soonest first (null dates last).
+[functions.instructor-workshops-upcoming]
+verify_jwt = true
+
+# JWT: instructor_id = auth.uid(); dated workshops before now; most recent first.
+[functions.instructor-workshops-past]
 verify_jwt = true
