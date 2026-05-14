@@ -38,7 +38,7 @@ Deno.serve(async (req: Request) => {
   const { data, error } = await supabase
     .from("workshops")
     .select(
-      "id, title, date, price, instructor_id, instructor, instructor_profile:profiles!instructor_id(full_name)",
+      "id, title, date, price, instructor_id, instructor, venue_name, instructor_profile:profiles!instructor_id(full_name)",
     )
     .or(`date.is.null,date.gte.${nowIso}`)
     .order("date", { ascending: true, nullsFirst: false })
@@ -65,6 +65,7 @@ Deno.serve(async (req: Request) => {
       price: row.price,
       instructor_id: row.instructor_id,
       instructor_name: instructorName,
+      venue_name: row.venue_name ?? null,
     };
   });
 
