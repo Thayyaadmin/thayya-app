@@ -11,6 +11,10 @@ verify_jwt = false
 [functions.discover-instructors]
 verify_jwt = false
 
+# Public /instructors/[slug] payload (profile + upcoming workshops); service role reads by slug.
+[functions.instructor-public]
+verify_jwt = false
+
 # Public workshop list for discover; optional lat/lng filters by haversine in the function.
 [functions.discover-workshops]
 verify_jwt = false

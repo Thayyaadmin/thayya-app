@@ -3,8 +3,7 @@ import { notFound } from "next/navigation";
 import { ChevronLeft, BadgeCheck } from "lucide-react";
 import type { Metadata } from "next";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getProfileBySlug } from "@/lib/profile";
+import { fetchPublicInstructorBySlug } from "@/lib/instructor-public";
 
 type RouteParams = { slug: string };
 
@@ -73,29 +72,23 @@ function splitNameForGradientHeading(fullName: string): { lead: string; gradient
 }
 
 async function loadInstructor(slug: string) {
-  const supabase = await createSupabaseServerClient();
-  const profile = await getProfileBySlug(supabase, slug);
-  if (!profile) return null;
-  if (profile.user_type !== "instructor" && profile.user_type !== "admin") {
-    // Slugs exist on every profile, but only instructors get a public page.
+  const { data, error } = await fetchPublicInstructorBySlug(slug);
+  if (error) {
+    console.error("[instructor page] instructor-public:", error);
     return null;
   }
+  if (!data) return null;
 
-  const nowIso = new Date().toISOString();
-  const { data: workshops, error } = await supabase
-    .from("workshops")
-    .select("id, title, date, price")
-    .eq("instructor_id", profile.id)
-    .or(`date.is.null,date.gte.${nowIso}`)
-    .order("date", { ascending: true, nullsFirst: false });
-
-  if (error) {
-    console.error("[instructor page] workshops fetch:", error.message);
-  }
+  const workshops = data.workshops.map((w) => ({
+    id: w.id,
+    title: w.title ?? "",
+    date: w.date,
+    price: w.price,
+  })) satisfies WorkshopSummary[];
 
   return {
-    profile,
-    workshops: (workshops ?? []) as WorkshopSummary[],
+    profile: data.profile,
+    workshops,
   };
 }
 
