@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { SiteEyebrow } from "@/components/site/atoms/SiteEyebrow";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { QuickActions } from "@/components/dashboard/quick-actions";
@@ -13,6 +14,21 @@ import {
   getInstructorDisplayName,
 } from "@/lib/instructor-profile";
 
+function timeOfDayGreeting(date: Date): string {
+  const h = date.getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function formatDashboardEyebrowDate(date: Date): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(date);
+}
+
 export default function InstructorDashboard() {
   const [refreshToken, setRefreshToken] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
@@ -20,6 +36,10 @@ export default function InstructorDashboard() {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  const now = new Date();
+  const greeting = timeOfDayGreeting(now);
+  const eyebrow = formatDashboardEyebrowDate(now);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,19 +63,31 @@ export default function InstructorDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader displayName={displayName} email={email} avatarUrl={avatarUrl} />
+      <DashboardHeader
+        displayName={displayName}
+        email={email}
+        avatarUrl={avatarUrl}
+        onAvatarUrlChange={setAvatarUrl}
+      />
 
       <main className="container mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <div className="mb-8">
-          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Welcome back
-            {displayName ? (
-              <>
-                , <span className="text-primary">{displayName}</span>
-              </>
-            ) : null}
-            .
-          </h2>
+          <div suppressHydrationWarning>
+            <SiteEyebrow className="mb-2">{eyebrow}</SiteEyebrow>
+            <h2 className="font-display text-4xl leading-[1.05] font-bold md:text-6xl">
+              {greeting},{" "}
+              {displayName ? (
+                <span className="gradient-text">{displayName}</span>
+              ) : (
+                <span className="gradient-text">there</span>
+              )}
+              .<br />
+              <span className="font-brush text-3xl md:text-5xl" style={{ color: "var(--t-magenta)" }}>
+                let&apos;s move
+              </span>
+              .
+            </h2>
+          </div>
           <p className="mt-1 text-muted-foreground">
             Here&apos;s what&apos;s happening with your workshops today.
           </p>
