@@ -115,6 +115,7 @@ export function DiscoverInstructorsMemberClient() {
               fullName={inst.full_name}
               slug={inst.slug}
               bio={inst.bio}
+              avatarUrl={inst.avatar_url}
             />
           ))}
         </div>

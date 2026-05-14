@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,7 @@ import {
 import { Bell, ImageUp, LogOut, Settings, User } from "lucide-react"
 import { supabase } from "@/app/supabaseClient"
 import { getInstructorInitials } from "@/lib/instructor-profile"
-import { postUploadProfileAvatar } from "@/lib/upload-profile-avatar"
+import { AvatarUploadDialog } from "@/components/dashboard/avatar-upload-dialog"
 
 type DashboardHeaderProps = {
   displayName: string
@@ -31,47 +31,8 @@ export function DashboardHeader({
   onAvatarUrlChange,
 }: DashboardHeaderProps) {
   const router = useRouter()
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [avatarDialogOpen, setAvatarDialogOpen] = useState(false)
   const initials = getInstructorInitials(displayName || email || "?")
-
-  const triggerFilePicker = useCallback(() => {
-    setUploadError(null)
-    window.setTimeout(() => fileInputRef.current?.click(), 0)
-  }, [])
-
-  const handleAvatarFileChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
-      e.target.value = ""
-      if (!file) return
-
-      setUploading(true)
-      setUploadError(null)
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      if (!session?.access_token) {
-        setUploadError("Sign in again to upload a picture.")
-        setUploading(false)
-        return
-      }
-
-      const result = await postUploadProfileAvatar(session.access_token, file)
-      setUploading(false)
-      if (!result.ok) {
-        setUploadError(result.message)
-        return
-      }
-
-      const next = result.profile.avatar_url
-      if (typeof next === "string" && next.startsWith("http")) {
-        onAvatarUrlChange?.(next)
-      }
-    },
-    [onAvatarUrlChange],
-  )
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut()
@@ -109,27 +70,6 @@ export function DashboardHeader({
             <span className="sr-only">Notifications</span>
           </Button>
 
-          {uploadError ? (
-            <p
-              className="max-w-[min(12rem,calc(100vw-12rem))] truncate text-xs text-destructive"
-              title={uploadError}
-            >
-              {uploadError}
-            </p>
-          ) : null}
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="sr-only"
-            tabIndex={-1}
-            aria-hidden
-            onChange={(e) => {
-              void handleAvatarFileChange(e)
-            }}
-          />
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -155,19 +95,15 @@ export function DashboardHeader({
                   ) : null}
                 </div>
               </DropdownMenuLabel>
-              {uploadError ? (
-                <p className="px-2 pb-2 text-xs text-destructive">{uploadError}</p>
-              ) : null}
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                disabled={uploading}
                 onSelect={(e) => {
                   e.preventDefault()
-                  triggerFilePicker()
+                  setAvatarDialogOpen(true)
                 }}
               >
                 <ImageUp className="mr-2 h-4 w-4" />
-                <span>{uploading ? "Uploading…" : "Upload picture"}</span>
+                <span>Upload picture</span>
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <User className="mr-2 h-4 w-4" />
@@ -190,6 +126,15 @@ export function DashboardHeader({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <AvatarUploadDialog
+            open={avatarDialogOpen}
+            onOpenChange={setAvatarDialogOpen}
+            displayName={displayName}
+            avatarUrl={avatarUrl}
+            initials={initials}
+            onAvatarUrlChange={onAvatarUrlChange}
+          />
         </div>
       </div>
     </header>

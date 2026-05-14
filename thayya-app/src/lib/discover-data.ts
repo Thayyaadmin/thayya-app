@@ -20,6 +20,8 @@ export type DiscoverInstructorRow = {
   slug: string | null;
   bio: string | null;
   user_type: string;
+  /** Public profile image URL when set (from discover-instructors API). */
+  avatar_url: string | null;
 };
 
 export type FetchDiscoverInstructorsOptions = {
