@@ -132,6 +132,8 @@ export default async function InstructorPage(
   const { profile, workshops } = result;
   const initials = initialsFromName(profile.full_name);
   const avVariant = avatarVariant(profile.id);
+  const avatarSrc = profile.avatar_url?.trim() ?? "";
+  const showAvatarPhoto = avatarSrc.length > 0;
   const bio =
     profile.bio?.trim() ||
     `${profile.full_name} hasn't added a bio yet — check back soon for more about their style and classes.`;
@@ -149,11 +151,23 @@ export default async function InstructorPage(
 
       <div className="mb-12 grid items-start gap-8 md:grid-cols-3 md:gap-10">
         <div
-          className={`av-${avVariant} relative mx-auto aspect-square max-w-[320px] rounded-3xl grain md:mx-0`}
+          className={`relative mx-auto aspect-square max-w-[320px] overflow-hidden rounded-3xl md:mx-0 ${
+            showAvatarPhoto ? "bg-black/10" : `av-${avVariant} grain`
+          }`}
         >
-          <div className="flex h-full w-full items-center justify-center font-display text-7xl font-bold text-white/95 md:text-8xl">
-            {initials}
-          </div>
+          {showAvatarPhoto ? (
+            <img
+              src={avatarSrc}
+              alt=""
+              className="h-full w-full object-cover"
+              loading="eager"
+              decoding="async"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center font-display text-7xl font-bold text-white/95 md:text-8xl">
+              {initials}
+            </div>
+          )}
           <div className="absolute right-4 bottom-4 flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold tracking-wider uppercase backdrop-blur">
             <BadgeCheck className="h-3 w-3" style={{ color: "var(--t-magenta)" }} /> Instructor
           </div>
