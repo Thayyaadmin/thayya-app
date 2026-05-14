@@ -1,9 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import {
-  DeleteObjectCommand,
-  PutObjectCommand,
-  S3Client,
-} from "npm:@aws-sdk/client-s3@3.693.0";
+import { AwsClient } from "npm:aws4fetch@1.0.20";
 
 /**
  * Authenticated users upload a profile image; file is stored in Cloudflare R2
@@ -17,7 +13,7 @@ import {
  *   R2_PUBLIC_URL        — public origin for objects, no trailing slash (e.g. https://cdn.example.com)
  *
  * Optional:
- *   R2_AVATAR_PREFIX      — defaults to "avatars"
+ *   R2_AVATAR_PREFIX      — defaults to "profile-avatars"
  *
  * Request: POST multipart/form-data with a single file field named `avatar` or `file`.
  * Allowed types: image/jpeg, image/png, image/webp. Max size 5 MiB.
@@ -52,11 +48,21 @@ function objectKeyFromPublicUrl(publicBase: string, url: string): string | null 
   }
 }
 
-function r2Client(accountId: string, accessKeyId: string, secretAccessKey: string) {
-  return new S3Client({
+/** Per-key path-segment encoding that preserves "/" separators. */
+function encodeObjectKey(key: string): string {
+  return key.split("/").map(encodeURIComponent).join("/");
+}
+
+function r2ObjectUrl(accountId: string, bucket: string, key: string): string {
+  return `https://${accountId}.r2.cloudflarestorage.com/${bucket}/${encodeObjectKey(key)}`;
+}
+
+function r2SignedClient(accessKeyId: string, secretAccessKey: string): AwsClient {
+  return new AwsClient({
+    accessKeyId,
+    secretAccessKey,
+    service: "s3",
     region: "auto",
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-    credentials: { accessKeyId, secretAccessKey },
   });
 }
 
@@ -149,13 +155,34 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const prefix = (Deno.env.get("R2_AVATAR_PREFIX") ?? "avatars").replace(/^\/+|\/+$/g, "");
+  const prefix = (Deno.env.get("R2_AVATAR_PREFIX") ?? "profile-avatars").replace(/^\/+|\/+$/g, "");
   const objectKey = `${prefix}/${user.id}/${crypto.randomUUID()}.${ext}`;
   const body = new Uint8Array(await file.arrayBuffer());
 
-  const s3 = r2Client(accountId, r2Key, r2Secret);
+  const r2 = r2SignedClient(r2Key, r2Secret);
   const publicBaseNorm = normalizePublicBase(publicBase);
   const avatarUrl = `${publicBaseNorm}/${objectKey}`;
+
+  // === DEBUG: remove once the 403 from R2 is resolved. ============================
+  // Logs only the non-secret parts of the R2 config and the URL being signed, so we
+  // can confirm in the dashboard logs that the right credentials and bucket name are
+  // bound at request time. Never log the full access key id or the secret.
+  console.log(
+    "[upload-profile-avatar][diag]",
+    JSON.stringify({
+      account_id: accountId,
+      account_id_len: accountId.length,
+      bucket,
+      access_key_id_prefix: r2Key.slice(0, 4),
+      access_key_id_suffix: r2Key.slice(-2),
+      access_key_id_len: r2Key.length,
+      secret_len: r2Secret.length,
+      object_url: r2ObjectUrl(accountId, bucket, objectKey),
+      content_type: contentType,
+      body_bytes: body.byteLength,
+    }),
+  );
+  // ===============================================================================
 
   const { data: prior, error: priorErr } = await supabase
     .from("profiles")
@@ -174,17 +201,20 @@ Deno.serve(async (req: Request) => {
       : null;
 
   try {
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: objectKey,
-        Body: body,
-        ContentType: contentType,
-        CacheControl: "public, max-age=31536000, immutable",
-      }),
-    );
+    const putRes = await r2.fetch(r2ObjectUrl(accountId, bucket, objectKey), {
+      method: "PUT",
+      body,
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=31536000, immutable",
+      },
+    });
+    if (!putRes.ok) {
+      const detail = await putRes.text().catch(() => "");
+      throw new Error(`R2 PUT ${putRes.status}: ${detail.slice(0, 200)}`);
+    }
   } catch (e) {
-    console.error("[upload-profile-avatar] R2 PutObject", e);
+    console.error("[upload-profile-avatar] R2 PUT", e);
     return Response.json({ error: "Failed to store image" }, { status: 502, headers: corsHeaders });
   }
 
@@ -200,7 +230,7 @@ Deno.serve(async (req: Request) => {
   if (updateErr) {
     console.error("[upload-profile-avatar] profile update", updateErr.message);
     try {
-      await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: objectKey }));
+      await r2.fetch(r2ObjectUrl(accountId, bucket, objectKey), { method: "DELETE" });
     } catch (delErr) {
       console.error("[upload-profile-avatar] rollback delete failed", delErr);
     }
@@ -211,7 +241,7 @@ Deno.serve(async (req: Request) => {
     const oldKey = objectKeyFromPublicUrl(publicBaseNorm, previousUrl);
     if (oldKey && oldKey !== objectKey && oldKey.startsWith(`${prefix}/${user.id}/`)) {
       try {
-        await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: oldKey }));
+        await r2.fetch(r2ObjectUrl(accountId, bucket, oldKey), { method: "DELETE" });
       } catch (delErr) {
         console.error("[upload-profile-avatar] old object delete", delErr);
       }
