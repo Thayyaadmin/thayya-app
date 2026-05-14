@@ -33,6 +33,7 @@ export function DiscoverInstructorsSection({ instructors, error }: DiscoverInstr
               fullName={inst.full_name}
               slug={inst.slug}
               bio={inst.bio}
+              avatarUrl={inst.avatar_url}
             />
           ))}
         </div>
