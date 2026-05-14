@@ -135,6 +135,7 @@ export async function saveWorkshop(
   const price = parsePrice(formData.get('price'));
   const slots = parseSlots(formData.get('slots'));
   const location = parseLocationJson(formData.get('location_json'));
+  const venue_name = optionalText(formData.get('venue_name'));
   const address_line = optionalText(formData.get('address_line'));
   const city = optionalText(formData.get('city'));
   const state = optionalText(formData.get('state'));
@@ -147,6 +148,7 @@ export async function saveWorkshop(
     price,
     slots,
     location,
+    venue_name,
     address_line,
     city,
     state,

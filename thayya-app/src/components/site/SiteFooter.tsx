@@ -12,7 +12,7 @@ export function SiteFooter() {
           className="text-center text-[11px] tracking-wider uppercase md:text-right"
           style={{ color: "var(--ink-muted)" }}
         >
-          © 2026 Thayya · Made in India · Next.js
+          © 2026 Thayya · Made in India
         </div>
       </div>
     </footer>

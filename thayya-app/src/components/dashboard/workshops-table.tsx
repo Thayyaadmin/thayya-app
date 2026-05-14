@@ -32,6 +32,8 @@ export type WorkshopRow = {
   status: WorkshopStatus
   price: number | null
   slots: number
+  /** Filled when the list API returns it (optional until backend adds the field). */
+  venue_name: string | null
   address_line: string | null
   city: string | null
   state: string | null
@@ -104,6 +106,8 @@ function mapDbRowToWorkshop(row: Record<string, unknown>): WorkshopRow | null {
     if (Number.isInteger(n) && n >= 1) slots = n
   }
 
+  const venue_name =
+    row.venue_name != null && String(row.venue_name).trim() ? String(row.venue_name).trim() : null
   const address_line =
     row.address_line != null && String(row.address_line).trim() ? String(row.address_line).trim() : null
   const city = row.city != null && String(row.city).trim() ? String(row.city).trim() : null
@@ -122,6 +126,7 @@ function mapDbRowToWorkshop(row: Record<string, unknown>): WorkshopRow | null {
     status: deriveStatus(dateIso),
     price,
     slots,
+    venue_name,
     address_line,
     city,
     state,

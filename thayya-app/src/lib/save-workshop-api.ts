@@ -13,6 +13,8 @@ export type SaveWorkshopRequestBody = {
   price?: number | null;
   slots?: number;
   location?: SaveWorkshopGeoJsonPoint | null;
+  /** Sent in the JSON body for the save-workshop API; backend may ignore until persisted. */
+  venue_name?: string | null;
   address_line?: string | null;
   city?: string | null;
   state?: string | null;

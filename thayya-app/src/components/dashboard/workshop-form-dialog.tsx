@@ -30,13 +30,14 @@ function toDatetimeLocalValue(iso: string | null | undefined): string {
 }
 
 type Addr = {
+  venue_name: string
   address_line: string
   city: string
   state: string
   country: string
 }
 
-const emptyAddr: Addr = { address_line: "", city: "", state: "", country: "" }
+const emptyAddr: Addr = { venue_name: "", address_line: "", city: "", state: "", country: "" }
 
 type WorkshopVenuePoint = PrimaryLocationPayload["primary_location"]
 
@@ -73,6 +74,7 @@ export function WorkshopFormDialog({
     if (mode === "edit" && initial) {
       setSlots(initial.slots)
       setAddr({
+        venue_name: initial.venue_name ?? "",
         address_line: initial.address_line ?? "",
         city: initial.city ?? "",
         state: initial.state ?? "",
@@ -117,6 +119,7 @@ export function WorkshopFormDialog({
     }
     setVenuePoint(payload.primary_location)
     setAddr({
+      venue_name: payload.venue_name ?? "",
       address_line: payload.address_line ?? "",
       city: payload.city ?? "",
       state: payload.state ?? "",
@@ -213,16 +216,11 @@ export function WorkshopFormDialog({
           </div>
 
           <div className="grid gap-2 border-t border-border pt-4">
-            <p className="text-sm font-medium text-foreground">Venue</p>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Map pin powers nearby discovery. You can fine-tune address fields below after choosing a
-              place.
-            </p>
             {hasGoogleMapsKey ? (
               <PrimaryLocationField
                 inputId="wf-venue-search"
-                label="Venue (Google Places)"
-                description="Search for the studio or hall. India addresses only."
+                label="Venue"
+                description=""
                 onChange={onVenueChange}
                 disabled={isPending}
               />
@@ -232,14 +230,25 @@ export function WorkshopFormDialog({
                 address fields manually (map pin optional).
               </p>
             )}
-            {venuePoint ? (
+            {/* {venuePoint ? (
               <p className="text-xs text-muted-foreground">
                 Pin set ({venuePoint.coordinates[1].toFixed(4)},{" "}
                 {venuePoint.coordinates[0].toFixed(4)}).
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">No map pin — workshop can still be saved.</p>
-            )}
+            )} */}
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="wf-venue_name">Venue name</Label>
+            <Input
+              id="wf-venue_name"
+              name="venue_name"
+              value={addr.venue_name}
+              onChange={(e) => setAddr((a) => ({ ...a, venue_name: e.target.value }))}
+              placeholder="Studio or place name"
+            />
           </div>
 
           <div className="grid gap-2">

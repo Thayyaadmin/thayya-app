@@ -8,7 +8,9 @@ export type PrimaryLocationPayload = {
   country: string;
   address_line: string | null;
   state: string | null;
-  /** Human-readable label for the input */
+  /** Google Places establishment / POI name when present */
+  venue_name: string | null;
+  /** Human-readable label for the input (prefer place name, else formatted address) */
   formattedLabel: string;
 };
 
@@ -27,18 +29,57 @@ function firstComponent(components: GoogleAddressComponent[], ...types: string[]
 }
 
 /**
- * Derive city / country / state / street line from Places `address_components`.
+ * Build address line: first `address_components` entry, then sublocality-style segment
+ * (sublocality_level_2 → sublocality → sublocality_level_1, or political combined with a local type),
+ * then formatted address (deduped segments).
+ */
+export function buildAddressLineFromComponents(
+  components: GoogleAddressComponent[],
+  formattedAddress: string | null | undefined,
+): string | null {
+  const first = components[0]?.long_name?.trim() ?? "";
+
+  let subPol = "";
+  for (const typ of ["sublocality_level_2", "sublocality", "sublocality_level_1"] as const) {
+    const c = components.find((x) => x.types.includes(typ));
+    if (c?.long_name?.trim()) {
+      subPol = c.long_name.trim();
+      break;
+    }
+  }
+  if (!subPol) {
+    const c = components.find(
+      (x) =>
+        x.types.includes("political") &&
+        (x.types.includes("sublocality_level_2") ||
+          x.types.includes("sublocality") ||
+          x.types.includes("neighborhood") ||
+          x.types.includes("premise")),
+    );
+    if (c?.long_name?.trim()) subPol = c.long_name.trim();
+  }
+
+  const formatted = formattedAddress?.trim() ?? "";
+
+  const rawPieces = [first, subPol, formatted].filter(Boolean);
+  const deduped: string[] = [];
+  for (const p of rawPieces) {
+    if (deduped[deduped.length - 1] === p) continue;
+    deduped.push(p);
+  }
+
+  const line = deduped.join(", ").trim();
+  return line.length ? line : null;
+}
+
+/**
+ * Derive city / country / state from Places `address_components`.
  */
 export function addressPartsFromComponents(components: GoogleAddressComponent[]): {
   city: string;
   country: string;
   state: string | null;
-  address_line: string | null;
 } {
-  const streetNumber = firstComponent(components, "street_number");
-  const route = firstComponent(components, "route");
-  const street = [streetNumber, route].filter(Boolean).join(" ").trim();
-
   const city =
     firstComponent(components, "locality") ||
     firstComponent(components, "sublocality", "sublocality_level_1") ||
@@ -52,7 +93,6 @@ export function addressPartsFromComponents(components: GoogleAddressComponent[])
     city,
     country,
     state,
-    address_line: street || null,
   };
 }
 
@@ -72,13 +112,18 @@ export function parseGooglePlaceResult(place: GooglePlaceLike | null | undefined
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
 
   const components = place.address_components ?? [];
-  const { city, country, state, address_line } = addressPartsFromComponents(components);
+  const { city, country, state } = addressPartsFromComponents(components);
   if (!city.trim() || !country.trim()) return null;
 
+  const venueNameRaw = place.name?.trim();
+  const venue_name = venueNameRaw && venueNameRaw.length > 0 ? venueNameRaw : null;
+
   const formattedLabel =
+    venue_name ||
     (place.formatted_address && place.formatted_address.trim()) ||
-    (place.name && place.name.trim()) ||
     [city, country].filter(Boolean).join(", ");
+
+  const address_line = buildAddressLineFromComponents(components, place.formatted_address ?? null);
 
   return {
     primary_location: { type: "Point", coordinates: [lng, lat] },
@@ -86,6 +131,7 @@ export function parseGooglePlaceResult(place: GooglePlaceLike | null | undefined
     country: country.trim(),
     address_line,
     state,
+    venue_name,
     formattedLabel,
   };
 }
