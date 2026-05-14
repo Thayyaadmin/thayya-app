@@ -1,0 +1,41 @@
+# Minimal config so `supabase functions serve|deploy` can find the project.
+# Run `supabase init` locally if you need full local stack defaults.
+
+project_id = "thayya-app"
+
+# Public read-only: upcoming workshops (bounded); service role in function.
+[functions.workshops-upcoming]
+verify_jwt = false
+
+# Public instructor cards for discover / home; service role reads a bounded profile list.
+[functions.discover-instructors]
+verify_jwt = false
+
+# Public workshop list for discover; optional lat/lng filters by haversine in the function.
+[functions.discover-workshops]
+verify_jwt = false
+
+# Requires a valid Supabase session JWT (Authorization: Bearer …).
+[functions.register-user-profile]
+verify_jwt = true
+
+# Session JWT; multipart image body uploaded to R2, then profiles.avatar_url updated.
+[functions.upload-profile-avatar]
+verify_jwt = true
+
+# Instructor/admin create/update workshop; validates JWT then writes with service role.
+[functions.save-workshop]
+verify_jwt = true
+
+# JWT: instructor_id = auth.uid(); date null or date >= now; soonest first (null dates last).
+[functions.instructor-workshops-upcoming]
+verify_jwt = true
+
+# JWT: instructor_id = auth.uid(); dated workshops before now; most recent first.
+[functions.instructor-workshops-past]
+verify_jwt = true
+
+# JWT: authenticated user registers themselves for a workshop. All business
+# rules (capacity, past-date, duplicate, self-registration) enforced in code.
+[functions.register-workshop]
+verify_jwt = true

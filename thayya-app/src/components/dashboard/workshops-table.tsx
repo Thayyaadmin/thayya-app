@@ -16,6 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search, Pencil, Trash2 } from "lucide-react"
 import { supabase } from "@/app/supabaseClient"
 import { deleteWorkshop } from "@/app/dashboard/workshops/actions"
+import { toGeoJsonPoint } from "@/lib/geo-point"
+import { fetchInstructorWorkshopsUpcoming } from "@/lib/instructor-workshops-upcoming-browser"
 
 export type WorkshopStatus = "active" | "upcoming" | "completed"
 
@@ -29,6 +31,15 @@ export type WorkshopRow = {
   dateIso: string | null
   status: WorkshopStatus
   price: number | null
+  slots: number
+  /** Filled when the list API returns it (optional until backend adds the field). */
+  venue_name: string | null
+  address_line: string | null
+  city: string | null
+  state: string | null
+  country: string | null
+  /** JSON string of `{ type: "Point", coordinates: [lng, lat] }` for the save-workshop form. */
+  locationGeoJson: string | null
 }
 
 function formatWorkshopDateDisplay(dateValue: string | null): string {
@@ -61,7 +72,15 @@ function mapDbRowToWorkshop(row: Record<string, unknown>): WorkshopRow | null {
   if (row.id === undefined || row.id === null) return null
 
   const title = row.title != null ? String(row.title) : "Untitled workshop"
-  const instructorRaw = row.instructor ?? row.instructor_name
+
+  // Prefer the linked profile's full_name (source of truth). Fall back to the
+  // legacy `instructor` / `instructor_name` text columns for rows that pre-date
+  // the FK or were never matched during backfill.
+  const profile = row.instructor_profile as { full_name?: string | null } | null | undefined
+  const instructorRaw =
+    (profile && typeof profile.full_name === "string" && profile.full_name) ||
+    row.instructor ||
+    row.instructor_name
   const instructor =
     instructorRaw != null && instructorRaw !== "" ? String(instructorRaw) : "—"
 
@@ -80,6 +99,24 @@ function mapDbRowToWorkshop(row: Record<string, unknown>): WorkshopRow | null {
     price = Number.isFinite(n) ? n : null
   }
 
+  const rawSlots = row.slots
+  let slots = 20
+  if (rawSlots !== null && rawSlots !== undefined && rawSlots !== "") {
+    const n = typeof rawSlots === "number" ? rawSlots : Number(rawSlots)
+    if (Number.isInteger(n) && n >= 1) slots = n
+  }
+
+  const venue_name =
+    row.venue_name != null && String(row.venue_name).trim() ? String(row.venue_name).trim() : null
+  const address_line =
+    row.address_line != null && String(row.address_line).trim() ? String(row.address_line).trim() : null
+  const city = row.city != null && String(row.city).trim() ? String(row.city).trim() : null
+  const state = row.state != null && String(row.state).trim() ? String(row.state).trim() : null
+  const country = row.country != null && String(row.country).trim() ? String(row.country).trim() : null
+
+  const geo = toGeoJsonPoint(row.location)
+  const locationGeoJson = geo ? JSON.stringify(geo) : null
+
   return {
     id: String(row.id),
     name: title,
@@ -88,6 +125,13 @@ function mapDbRowToWorkshop(row: Record<string, unknown>): WorkshopRow | null {
     dateIso,
     status: deriveStatus(dateIso),
     price,
+    slots,
+    venue_name,
+    address_line,
+    city,
+    state,
+    country,
+    locationGeoJson,
   }
 }
 
@@ -118,17 +162,27 @@ export function WorkshopsTable({ refreshToken = 0, onEdit }: WorkshopsTableProps
     setLoading(true)
     setLoadError(null)
 
-    const { data, error } = await supabase.from("workshops").select("*")
-
-    if (error) {
-      console.error("Workshops fetch error:", error)
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    if (!session?.access_token) {
       setWorkshops([])
-      setLoadError(error.message || "Could not load workshops.")
+      setLoadError("You must be signed in to view your workshops.")
       setLoading(false)
       return
     }
 
-    const rows = (Array.isArray(data) ? data : [])
+    const { workshops: data, error } = await fetchInstructorWorkshopsUpcoming(session.access_token)
+
+    if (error) {
+      console.error("Workshops fetch error:", error)
+      setWorkshops([])
+      setLoadError(error)
+      setLoading(false)
+      return
+    }
+
+    const rows = data
       .map((r) => mapDbRowToWorkshop(r as Record<string, unknown>))
       .filter((r): r is WorkshopRow => r !== null)
 
@@ -182,9 +236,14 @@ export function WorkshopsTable({ refreshToken = 0, onEdit }: WorkshopsTableProps
 
   return (
     <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
-      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <CardTitle className="text-lg font-semibold">Current Workshops</CardTitle>
-        <div className="relative w-full sm:w-72">
+      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1 space-y-1">
+          <CardTitle className="text-lg font-semibold">Your upcoming workshops</CardTitle>
+          <p className="text-muted-foreground text-sm">
+            Only workshops you lead, dated today or later (or with no date yet). Past runs are not listed here.
+          </p>
+        </div>
+        <div className="relative w-full sm:w-72 sm:shrink-0">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search workshops..."
