@@ -19,6 +19,8 @@ type Body = {
   price?: number | null;
   slots?: number;
   location?: GeoJsonPoint | null;
+  /** Human-readable venue label (e.g. "Studio 5"). */
+  venue_name?: string | null;
   /** Venue / address text (same shape as `profiles`). */
   address_line?: string | null;
   city?: string | null;
@@ -42,6 +44,13 @@ function parseGeoPoint(p: unknown): GeoJsonPoint | null {
   return { type: "Point", coordinates: [lng, lat] };
 }
 
+/** PostgREST + `geography(Point,4326)` reliably accepts EWKT; raw GeoJSON often
+ *  triggers "invalid geometry". Mirrors the pattern in register-user-profile. */
+function pointToEwkt(geo: GeoJsonPoint): string {
+  const [lng, lat] = geo.coordinates;
+  return `SRID=4326;POINT(${lng} ${lat})`;
+}
+
 const uuidRe =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -62,14 +71,14 @@ const OMIT = Symbol("omit");
 /** On update: if the key was not sent in JSON, do not change the column. */
 function textFieldForPatch(
   body: Body,
-  key: "address_line" | "city" | "state" | "country",
+  key: "venue_name" | "address_line" | "city" | "state" | "country",
 ): string | null | typeof OMIT {
   if (!Object.prototype.hasOwnProperty.call(body, key)) return OMIT;
   return optionalTrimmedText(body[key]);
 }
 
 const selectCols =
-  "id, title, date, price, instructor_id, instructor, slots, location, address_line, city, state, country, created_at, updated_at";
+  "id, title, date, price, instructor_id, instructor, slots, location, venue_name, address_line, city, state, country, created_at, updated_at";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -148,6 +157,7 @@ Deno.serve(async (req: Request) => {
   const locationSent = Object.prototype.hasOwnProperty.call(body, "location");
   const location = locationSent ? parseGeoPoint(body.location ?? null) : null;
 
+  const venue_name = optionalTrimmedText(body.venue_name);
   const address_line = optionalTrimmedText(body.address_line);
   const city = optionalTrimmedText(body.city);
   const state = optionalTrimmedText(body.state);
@@ -231,10 +241,18 @@ Deno.serve(async (req: Request) => {
     };
 
     if (locationSent) {
-      patch.location = location;
+      patch.location = location ? pointToEwkt(location) : null;
     }
 
-    for (const key of ["address_line", "city", "state", "country"] as const) {
+    for (
+      const key of [
+        "venue_name",
+        "address_line",
+        "city",
+        "state",
+        "country",
+      ] as const
+    ) {
       const v = textFieldForPatch(body, key);
       if (v !== OMIT) patch[key] = v;
     }
@@ -314,7 +332,8 @@ Deno.serve(async (req: Request) => {
     instructor_id: instructorId,
     instructor: instructorName,
     slots,
-    location: locationSent ? location : null,
+    location: location ? pointToEwkt(location) : null,
+    venue_name,
     address_line,
     city,
     state,
