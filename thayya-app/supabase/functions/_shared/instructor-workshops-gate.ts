@@ -7,7 +7,7 @@ export const corsHeaders: Record<string, string> = {
 };
 
 export const SELECT_COLS =
-  "id, title, date, price, instructor_id, instructor, slots, location, address_line, city, state, country, created_at, updated_at";
+  "id, title, date, price, instructor_id, instructor, slots, location, venue_name, address_line, city, state, country, created_at, updated_at";
 
 export const FETCH_CAP = 500;
 

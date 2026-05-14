@@ -34,3 +34,8 @@ verify_jwt = true
 # JWT: instructor_id = auth.uid(); dated workshops before now; most recent first.
 [functions.instructor-workshops-past]
 verify_jwt = true
+
+# JWT: authenticated user registers themselves for a workshop. All business
+# rules (capacity, past-date, duplicate, self-registration) enforced in code.
+[functions.register-workshop]
+verify_jwt = true

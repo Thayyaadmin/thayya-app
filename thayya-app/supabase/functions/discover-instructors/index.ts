@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import postgres from "npm:postgres@3";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -7,8 +8,7 @@ const corsHeaders: Record<string, string> = {
 };
 
 const DEFAULT_RADIUS_KM = 20;
-/** Safety cap on rows read when doing in-memory distance filter. */
-const NEARBY_FETCH_CAP = 1000;
+const MAX_RESULTS = 8;
 
 type InstructorRow = {
   id: string;
@@ -19,7 +19,7 @@ type InstructorRow = {
   avatar_url: string | null;
 };
 
-type ProfileWithPin = InstructorRow & { primary_location?: unknown };
+type NearbyInstructorRow = InstructorRow & { distance_m: number | string };
 
 function parseQueryNumber(url: URL, name: string): number | null {
   const raw = url.searchParams.get(name);
@@ -37,38 +37,26 @@ function parseViewerPoint(url: URL): { lat: number; lng: number } | null {
   return { lat, lng };
 }
 
-/** GeoJSON Point or EWKT from PostgREST / geography column. */
-function coordsFromPoint(value: unknown): { lat: number; lng: number } | null {
-  if (value == null) return null;
-  if (typeof value === "string") {
-    const m = /^SRID=\d+;POINT\(([-.0-9eE+]+)\s+([-.0-9eE+]+)\)$/i.exec(value.trim());
-    if (m) {
-      const lng = Number(m[1]);
-      const lat = Number(m[2]);
-      return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
-    }
-    return null;
+/**
+ * Lazily-built Postgres.js client reused across warm invocations in the same isolate.
+ * Uses `SUPABASE_DB_URL` (the Supavisor transaction pooler), so we disable prepared
+ * statements and keep pool size small.
+ */
+let sqlClient: ReturnType<typeof postgres> | null = null;
+function getSql(): ReturnType<typeof postgres> {
+  if (sqlClient) return sqlClient;
+  const dbUrl = Deno.env.get("SUPABASE_DB_URL");
+  if (!dbUrl) {
+    throw new Error(
+      "Missing SUPABASE_DB_URL. This is automatically injected for Edge Functions on Supabase.",
+    );
   }
-  if (typeof value === "object" && value !== null) {
-    const o = value as { type?: string; coordinates?: unknown[] };
-    if (o.type === "Point" && Array.isArray(o.coordinates) && o.coordinates.length >= 2) {
-      const lng = Number(o.coordinates[0]);
-      const lat = Number(o.coordinates[1]);
-      return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
-    }
-  }
-  return null;
-}
-
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371;
-  const toR = (d: number) => (d * Math.PI) / 180;
-  const dLat = toR(lat2 - lat1);
-  const dLng = toR(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toR(lat1)) * Math.cos(toR(lat2)) * Math.sin(dLng / 2) ** 2;
-  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  sqlClient = postgres(dbUrl, {
+    prepare: false,
+    max: 1,
+    idle_timeout: 20,
+  });
+  return sqlClient;
 }
 
 Deno.serve(async (req: Request) => {
@@ -95,61 +83,68 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const admin = createClient(url, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-
   const reqUrl = new URL(req.url);
   const viewer = parseViewerPoint(reqUrl);
 
   if (viewer) {
-    const { data, error } = await admin
-      .from("profiles")
-      .select("id, full_name, slug, bio, user_type, avatar_url, primary_location")
-      .eq("user_type", "instructor")
-      .not("slug", "is", null)
-      .not("primary_location", "is", null)
-      .limit(NEARBY_FETCH_CAP);
+    const radiusMeters = DEFAULT_RADIUS_KM * 1000;
+    try {
+      const sql = getSql();
+      const rows = (await sql<NearbyInstructorRow[]>`
+        select
+          id,
+          full_name,
+          slug,
+          bio,
+          user_type,
+          avatar_url,
+          st_distance(
+            primary_location,
+            st_setsrid(st_makepoint(${viewer.lng}, ${viewer.lat}), 4326)::geography
+          ) as distance_m
+        from public.profiles
+        where user_type = 'instructor'
+          and slug is not null
+          and primary_location is not null
+          and st_dwithin(
+            primary_location,
+            st_setsrid(st_makepoint(${viewer.lng}, ${viewer.lat}), 4326)::geography,
+            ${radiusMeters}
+          )
+        order by distance_m asc
+        limit ${MAX_RESULTS}
+      `) as unknown as NearbyInstructorRow[];
 
-    if (error) {
-      console.error("[discover-instructors] nearby fetch", error.message);
+      const instructors: InstructorRow[] = rows.map((row) => ({
+        id: row.id,
+        full_name: row.full_name,
+        slug: row.slug,
+        bio: row.bio,
+        user_type: row.user_type,
+        avatar_url: row.avatar_url ?? null,
+      }));
+
       return Response.json(
-        { error: error.message },
+        {
+          instructors,
+          search: "nearby" as const,
+          radius_km: DEFAULT_RADIUS_KM,
+        },
+        { headers: corsHeaders },
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("[discover-instructors] nearby SQL", message);
+      return Response.json(
+        { error: message },
         { status: 500, headers: corsHeaders },
       );
     }
-
-    const rows = (data ?? []) as ProfileWithPin[];
-    const ranked = rows
-      .map((row) => {
-        const c = coordsFromPoint(row.primary_location);
-        if (!c) return null;
-        const km = haversineKm(viewer.lat, viewer.lng, c.lat, c.lng);
-        if (km > DEFAULT_RADIUS_KM) return null;
-        return { row, km };
-      })
-      .filter((x): x is { row: ProfileWithPin; km: number } => x !== null)
-      .sort((a, b) => a.km - b.km)
-      .slice(0, 8);
-
-    const instructors: InstructorRow[] = ranked.map(({ row }) => ({
-      id: row.id,
-      full_name: row.full_name,
-      slug: row.slug,
-      bio: row.bio,
-      user_type: row.user_type,
-      avatar_url: row.avatar_url ?? null,
-    }));
-
-    return Response.json(
-      {
-        instructors,
-        search: "nearby" as const,
-        radius_km: DEFAULT_RADIUS_KM,
-      },
-      { headers: corsHeaders },
-    );
   }
+
+  const admin = createClient(url, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 
   const { data, error } = await admin
     .from("profiles")
@@ -157,7 +152,7 @@ Deno.serve(async (req: Request) => {
     .eq("user_type", "instructor")
     .not("slug", "is", null)
     .order("created_at", { ascending: false })
-    .limit(8);
+    .limit(MAX_RESULTS);
 
   if (error) {
     console.error("[discover-instructors]", error.message);
