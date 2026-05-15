@@ -11,6 +11,7 @@ export type PublicInstructorProfile = {
 
 export type PublicInstructorWorkshop = {
   id: string;
+  slug: string | null;
   title: string | null;
   date: string | null;
   price: number | null;

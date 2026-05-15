@@ -75,7 +75,7 @@ Deno.serve(async (req: Request) => {
   const nowIso = new Date().toISOString();
   const { data: workshops, error: workshopsError } = await admin
     .from("workshops")
-    .select("id, title, date, price")
+    .select("id, slug, title, date, price")
     .eq("instructor_id", profile.id)
     .or(`date.is.null,date.gte.${nowIso}`)
     .order("date", { ascending: true, nullsFirst: false });

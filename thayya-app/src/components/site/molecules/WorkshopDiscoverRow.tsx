@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { formatWorkshopDate, formatWorkshopPrice } from "@/lib/workshop-display";
 import type { DiscoverWorkshopRow } from "@/lib/discover-data";
+import { workshopPublicPath } from "@/lib/workshop-path";
 
 export type WorkshopDiscoverRowProps = {
   workshop: DiscoverWorkshopRow;
@@ -20,7 +21,7 @@ export function WorkshopDiscoverRow({ workshop, index }: WorkshopDiscoverRowProp
 
   return (
     <Link
-      href="/member/book"
+      href={workshop.id ? workshopPublicPath(workshop) : "/member/discover"}
       className="lift flex w-full items-center gap-4 rounded-2xl p-4 text-left"
       style={{ background: "white", border: "1px solid var(--line)" }}
     >

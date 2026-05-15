@@ -1,0 +1,7 @@
+# Repo root — app lives in thayya-app/. See thayya-app/.gitignore for Next.js rules.
+
+# Supabase CLI cache if `supabase link` was run from the repo root (not thayya-app/)
+/supabase/.temp/
+
+# macOS
+.DS_Store
