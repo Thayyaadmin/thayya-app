@@ -1,17 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search, Pencil, Trash2 } from "lucide-react"
 import { supabase } from "@/app/supabaseClient"
@@ -144,6 +135,106 @@ function formatInr(price: number | null): string {
   }).format(price)
 }
 
+function dayStart(d: Date): Date {
+  const t = new Date(d)
+  t.setHours(0, 0, 0, 0)
+  return t
+}
+
+function isSameCalendarDay(a: Date, b: Date): boolean {
+  return dayStart(a).getTime() === dayStart(b).getTime()
+}
+
+function formatWorkshopTime(dateIso: string | null): string {
+  if (!dateIso) return ""
+  const d = new Date(dateIso)
+  if (Number.isNaN(d.getTime())) return ""
+  return d.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  })
+}
+
+function formatPrimaryVenueLine(w: WorkshopRow): string {
+  if (w.venue_name) return w.venue_name
+  const parts = [w.city, w.state].filter(Boolean)
+  if (parts.length) return parts.join(", ")
+  if (w.address_line) {
+    const s = w.address_line.trim()
+    return s.length > 96 ? `${s.slice(0, 93)}…` : s
+  }
+  return ""
+}
+
+function buildWorkshopGlanceSubtitle(w: WorkshopRow): string {
+  const time = formatWorkshopTime(w.dateIso)
+  const venue = formatPrimaryVenueLine(w)
+  const price = formatInr(w.price)
+  const spots = `${w.slots} spot${w.slots === 1 ? "" : "s"}`
+
+  const head: string[] = []
+  if (time) head.push(time)
+  if (venue) head.push(`at ${venue}`)
+  const headStr = head.join(" ")
+  const tail = [price, spots].join(" · ")
+  return headStr ? `${headStr} · ${tail}` : tail
+}
+
+/** Short label for the top-right pill (mirrors instructor “In 4 hours” glance). */
+function formatRelativeGlanceBadge(
+  dateIso: string | null,
+  status: WorkshopStatus,
+  dateDisplay: string,
+): string {
+  if (status === "completed") return "Past"
+  if (!dateIso) return "TBD"
+
+  const d = new Date(dateIso)
+  if (Number.isNaN(d.getTime())) return "TBD"
+
+  const now = new Date()
+  const diffMs = d.getTime() - now.getTime()
+  const diffMins = Math.round(diffMs / 60000)
+
+  if (isSameCalendarDay(d, now)) {
+    if (diffMins >= 0 && diffMins < 90) return diffMins <= 1 ? "Soon" : `In ${diffMins} min`
+    if (diffMins >= 0 && diffMins < 24 * 60) return `In ${Math.round(diffMins / 60)}h`
+    return "Today"
+  }
+
+  const tomorrow = dayStart(now)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  if (isSameCalendarDay(d, tomorrow)) return "Tomorrow"
+
+  const daysUntil = Math.round((dayStart(d).getTime() - dayStart(now).getTime()) / 86400000)
+  if (daysUntil > 1 && daysUntil <= 7) return `In ${daysUntil} days`
+
+  return dateDisplay
+}
+
+function statusEyebrowLabel(status: WorkshopStatus): string {
+  switch (status) {
+    case "active":
+      return "Today"
+    case "completed":
+      return "Past run"
+    default:
+      return "Upcoming"
+  }
+}
+
+function glancePillStyle(status: WorkshopStatus): { background: string; color: string } {
+  switch (status) {
+    case "active":
+      return { background: "rgba(31,169,160,0.12)", color: "var(--t-teal)" }
+    case "completed":
+      return { background: "rgba(10,10,10,0.06)", color: "var(--ink-muted)" }
+    default:
+      return { background: "rgba(232,51,77,0.12)", color: "var(--t-red)" }
+  }
+}
+
 type WorkshopsTableProps = {
   /** Bump to refetch rows from Supabase after server mutations. */
   refreshToken?: number
@@ -197,11 +288,21 @@ export function WorkshopsTable({ refreshToken = 0, onEdit }: WorkshopsTableProps
   const filteredWorkshops = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return workshops
-    return workshops.filter(
-      (w) =>
-        w.name.toLowerCase().includes(q) ||
-        w.instructor.toLowerCase().includes(q)
-    )
+    return workshops.filter((w) => {
+      const hay = [
+        w.name,
+        w.instructor,
+        w.venue_name,
+        w.address_line,
+        w.city,
+        w.state,
+        w.country,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+      return hay.includes(q)
+    })
   }, [workshops, searchQuery])
 
   const handleDelete = (id: string) => {
@@ -221,24 +322,13 @@ export function WorkshopsTable({ refreshToken = 0, onEdit }: WorkshopsTableProps
     })
   }
 
-  const getStatusBadge = (status: WorkshopStatus) => {
-    const variants = {
-      active: "bg-emerald-100 text-emerald-700 border-emerald-200",
-      upcoming: "bg-primary/15 text-primary border-primary/25",
-      completed: "bg-muted text-muted-foreground border-border",
-    }
-    return (
-      <Badge variant="outline" className={variants[status]}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    )
-  }
-
   return (
     <Card className="border-border/50 bg-card/80 backdrop-blur-sm">
       <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1 space-y-1">
-          <CardTitle className="text-lg font-semibold">Your upcoming workshops</CardTitle>
+          <CardTitle id="upcoming-workshops-heading" className="text-lg font-semibold">
+            Your upcoming workshops
+          </CardTitle>
           <p className="text-muted-foreground text-sm">
             Only workshops you lead, dated today or later (or with no date yet). Past runs are not listed here.
           </p>
@@ -246,7 +336,7 @@ export function WorkshopsTable({ refreshToken = 0, onEdit }: WorkshopsTableProps
         <div className="relative w-full sm:w-72 sm:shrink-0">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search workshops..."
+            placeholder="Search name, venue, city…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 bg-secondary/50 border-border/50 focus:border-primary/50"
@@ -257,61 +347,78 @@ export function WorkshopsTable({ refreshToken = 0, onEdit }: WorkshopsTableProps
         {loadError ? (
           <p className="mb-4 text-sm text-destructive">{loadError}</p>
         ) : null}
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border/50 hover:bg-transparent">
-                <TableHead className="text-muted-foreground">Workshop</TableHead>
-                <TableHead className="text-muted-foreground hidden sm:table-cell">
-                  Date
-                </TableHead>
-                <TableHead className="text-muted-foreground hidden md:table-cell">
-                  Instructor
-                </TableHead>
-                <TableHead className="text-muted-foreground hidden lg:table-cell">
-                  Price
-                </TableHead>
-                <TableHead className="text-muted-foreground">Status</TableHead>
-                <TableHead className="text-muted-foreground text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                    Loading workshops…
-                  </TableCell>
-                </TableRow>
-              ) : filteredWorkshops.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                    No workshops found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredWorkshops.map((workshop) => (
-                  <TableRow
+        <div className="min-w-0">
+          <div
+            className="text-muted-foreground mb-3 hidden items-center justify-between border-b border-border/50 pb-2 text-sm font-medium sm:flex"
+            aria-hidden
+          >
+            <span>Workshop</span>
+            <span className="w-[100px] shrink-0 text-right">Actions</span>
+          </div>
+
+          {loading ? (
+            <p className="text-muted-foreground py-12 text-center text-sm">Loading workshops…</p>
+          ) : filteredWorkshops.length === 0 ? (
+            <p className="text-muted-foreground py-12 text-center text-sm">No workshops found.</p>
+          ) : (
+            <ul
+              className="flex flex-col gap-3"
+              role="list"
+              aria-labelledby="upcoming-workshops-heading"
+            >
+              {filteredWorkshops.map((workshop) => {
+                const pill = glancePillStyle(workshop.status)
+                const badgeText = formatRelativeGlanceBadge(
+                  workshop.dateIso,
+                  workshop.status,
+                  workshop.dateDisplay,
+                )
+                return (
+                  <li
                     key={workshop.id}
-                    className="border-border/30 hover:bg-secondary/30 transition-colors"
+                    className="group rounded-2xl p-2 transition-colors hover:bg-muted/15 sm:p-3"
                   >
-                    <TableCell className="font-medium">{workshop.name}</TableCell>
-                    <TableCell className="hidden sm:table-cell text-muted-foreground">
-                      {workshop.dateDisplay}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground">
-                      {workshop.instructor}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell text-muted-foreground">
-                      {formatInr(workshop.price)}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(workshop.status)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="bg-card rounded-2xl border border-border/80 p-4 shadow-sm sm:p-5">
+                          <div className="mb-2 flex items-start justify-between gap-3">
+                            <div className="text-muted-foreground text-[10px] font-bold tracking-[0.2em] uppercase">
+                              {statusEyebrowLabel(workshop.status)}
+                            </div>
+                            <span
+                              className="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wider uppercase"
+                              style={pill}
+                            >
+                              {badgeText}
+                            </span>
+                          </div>
+                          <div className="font-display mt-2 mb-1 text-lg font-bold sm:text-xl md:text-2xl">
+                            {workshop.name}
+                          </div>
+                          <div className="text-muted-foreground mb-1 line-clamp-2 text-sm leading-snug sm:line-clamp-none">
+                            {buildWorkshopGlanceSubtitle(workshop)}
+                          </div>
+                          {workshop.instructor !== "—" ? (
+                            <div className="text-muted-foreground mb-4 text-xs font-medium sm:text-sm">
+                              Led by {workshop.instructor}
+                            </div>
+                          ) : (
+                            <div className="mb-4" />
+                          )}
+                          <div className="bg-muted h-2 overflow-hidden rounded-full" aria-hidden>
+                            <div
+                              className="gradient-bg-warm h-full rounded-full opacity-35"
+                              style={{ width: "100%" }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-row justify-end gap-1 sm:w-[100px] sm:flex-col sm:items-end sm:pt-1">
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                          className="h-8 w-8 text-muted-foreground hover:bg-primary/10 hover:text-primary"
                           disabled={!onEdit}
                           onClick={() => onEdit?.(workshop)}
                           title={onEdit ? "Edit workshop" : undefined}
@@ -323,7 +430,7 @@ export function WorkshopsTable({ refreshToken = 0, onEdit }: WorkshopsTableProps
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          className="h-8 w-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                           disabled={deleteId === workshop.id || isPending}
                           onClick={() => handleDelete(workshop.id)}
                         >
@@ -331,12 +438,12 @@ export function WorkshopsTable({ refreshToken = 0, onEdit }: WorkshopsTableProps
                           <span className="sr-only">Delete {workshop.name}</span>
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </div>
       </CardContent>
     </Card>
