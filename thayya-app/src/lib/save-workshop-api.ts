@@ -20,6 +20,7 @@ export type SaveWorkshopRequestBody = {
   state?: string | null;
   country?: string | null;
   instructor_id?: string | null;
+  tags?: string[];
 };
 
 export type PostSaveWorkshopEdgeResult =

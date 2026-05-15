@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { allocateWorkshopSlug } from "../_shared/workshop-slug.ts";
+import { normalizeWorkshopTags } from "../_shared/workshop-tags.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -29,6 +30,8 @@ type Body = {
   country?: string | null;
   /** Create + admin only: assign workshop to this profile id. */
   instructor_id?: string | null;
+  /** Full tag list for this workshop (replaces existing on update). */
+  tags?: string[] | null;
 };
 
 function parseGeoPoint(p: unknown): GeoJsonPoint | null {
@@ -79,7 +82,7 @@ function textFieldForPatch(
 }
 
 const selectCols =
-  "id, slug, title, date, price, instructor_id, instructor, slots, location, venue_name, address_line, city, state, country, created_at, updated_at";
+  "id, slug, title, date, price, instructor_id, instructor, slots, tags, location, venue_name, address_line, city, state, country, created_at, updated_at";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -163,6 +166,9 @@ Deno.serve(async (req: Request) => {
   const city = optionalTrimmedText(body.city);
   const state = optionalTrimmedText(body.state);
   const country = optionalTrimmedText(body.country);
+
+  const tagsSent = Object.prototype.hasOwnProperty.call(body, "tags");
+  const tags = tagsSent ? normalizeWorkshopTags(body.tags) : null;
 
   const userClient = createClient(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -258,6 +264,10 @@ Deno.serve(async (req: Request) => {
       if (v !== OMIT) patch[key] = v;
     }
 
+    if (tagsSent) {
+      patch.tags = tags;
+    }
+
     const { data: row, error: updateErr } = await admin
       .from("workshops")
       .update(patch)
@@ -349,6 +359,7 @@ Deno.serve(async (req: Request) => {
     city,
     state,
     country,
+    tags: tags ?? [],
   };
 
   const { data: row, error: insertErr } = await admin

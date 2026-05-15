@@ -213,6 +213,15 @@ export function WorkshopDetailView({
             </p>
           )}
           <div className="flex flex-wrap gap-2">
+            {(workshop.tags ?? []).map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full px-3 py-1 text-xs font-semibold tracking-wider uppercase"
+                style={{ background: "var(--bg-warm)", color: "var(--ink-soft)" }}
+              >
+                {tag}
+              </span>
+            ))}
             {registered ? (
               <span
                 className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold tracking-wider uppercase"

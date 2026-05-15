@@ -18,6 +18,9 @@ export function WorkshopDiscoverRow({ workshop, index }: WorkshopDiscoverRowProp
     workshop.instructor ||
     workshop.instructor_name ||
     "Instructor TBA";
+  const tags = Array.isArray(workshop.tags)
+    ? workshop.tags.map((t) => String(t).trim()).filter(Boolean)
+    : [];
 
   return (
     <Link
@@ -35,6 +38,19 @@ export function WorkshopDiscoverRow({ workshop, index }: WorkshopDiscoverRowProp
         <div className="text-xs" style={{ color: "var(--ink-muted)" }}>
           {instructorLine} · {formatWorkshopDate(workshop.date)}
         </div>
+        {tags.length > 0 ? (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {tags.slice(0, 4).map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                style={{ background: "var(--bg-warm)", color: "var(--ink-soft)" }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
       <div className="text-right">
         <div className="font-display text-base font-bold gradient-text md:text-lg">
