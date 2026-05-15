@@ -10,12 +10,14 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { UserType } from "@/lib/profile";
 import {
   readStoredViewerLocation,
   writeStoredViewerLocation,
   type StoredViewerLocation,
 } from "@/lib/member-viewer-location-storage";
+import { reverseGeocodeViewerLabel } from "@/lib/viewer-location-geocode";
+import { VIEWER_AREA_PRESETS } from "@/lib/viewer-area-presets";
+import { ViewerLocationPickerContent } from "@/components/site/elements/viewer-location-picker-content";
 import {
   Dialog,
   DialogContent,
@@ -24,12 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-export const MEMBER_AREA_PRESETS = [
-  { label: "Coimbatore", lat: 11.0141262, lng: 76.8846626 },
-  { label: "Bangalore", lat: 12.9881312, lng: 77.5393993 },
-] as const;
-
-const GEO_LABEL = "Near you";
+export { VIEWER_AREA_PRESETS as MEMBER_AREA_PRESETS };
 
 const GEO_OPTIONS = {
   enableHighAccuracy: false,
@@ -38,7 +35,6 @@ const GEO_OPTIONS = {
 };
 
 export type MemberViewerLocationContextValue = {
-  isMember: boolean;
   /** True after first client read of localStorage */
   hydrated: boolean;
   location: StoredViewerLocation | null;
@@ -53,7 +49,6 @@ export function useMemberViewerLocation(): MemberViewerLocationContextValue {
   const ctx = useContext(MemberViewerLocationContext);
   if (!ctx) {
     return {
-      isMember: false,
       hydrated: true,
       location: null,
       headerTaglineRight: "Dance fitness · India",
@@ -64,17 +59,10 @@ export function useMemberViewerLocation(): MemberViewerLocationContextValue {
 }
 
 type ProviderProps = {
-  userType: UserType | null;
-  isAuthenticated: boolean;
   children: ReactNode;
 };
 
-export function MemberViewerLocationProvider({
-  userType,
-  isAuthenticated,
-  children,
-}: ProviderProps) {
-  const isMember = isAuthenticated && userType === "member";
+export function MemberViewerLocationProvider({ children }: ProviderProps) {
   const [hydrated, setHydrated] = useState(false);
   const [location, setLocation] = useState<StoredViewerLocation | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -84,22 +72,38 @@ export function MemberViewerLocationProvider({
   locationRef.current = location;
 
   /** First visit: show our dialog until a pin exists (not only after geo fails). */
-  const needAreaChoice = isMember && hydrated && location === null;
+  const needAreaChoice = hydrated && location === null;
 
   useEffect(() => {
-    if (!isMember) {
-      setHydrated(true);
-      return;
-    }
     const stored = readStoredViewerLocation();
     setLocation(stored);
     setHydrated(true);
-  }, [isMember]);
+
+    if (stored && stored.label === "Near you") {
+      const myEpoch = ++geoEpochRef.current;
+      void reverseGeocodeViewerLabel(stored.lat, stored.lng).then((label) => {
+        if (myEpoch !== geoEpochRef.current) return;
+        const upgraded = { ...stored, label };
+        setLocation(upgraded);
+        writeStoredViewerLocation(upgraded);
+      });
+    }
+  }, []);
 
   const persist = useCallback((loc: StoredViewerLocation | null) => {
     setLocation(loc);
     writeStoredViewerLocation(loc);
   }, []);
+
+  const saveDeviceLocation = useCallback(
+    async (lat: number, lng: number, epoch: number) => {
+      const label = await reverseGeocodeViewerLabel(lat, lng);
+      if (epoch !== geoEpochRef.current) return;
+      persist({ lat, lng, label });
+      setPickerOpen(false);
+    },
+    [persist],
+  );
 
   const tryGeolocation = useCallback(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -108,141 +112,98 @@ export function MemberViewerLocationProvider({
     const myEpoch = ++geoEpochRef.current;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        if (myEpoch !== geoEpochRef.current) return;
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-        persist({ lat, lng, label: GEO_LABEL });
-        setPickerOpen(false);
+        void saveDeviceLocation(lat, lng, myEpoch);
       },
       () => {
         /* no-op: user can pick a city in the dialog */
       },
       GEO_OPTIONS,
     );
-  }, [persist]);
+  }, [saveDeviceLocation]);
 
-  /** When the member first needs an area (or re-enters after clearing), try device location once. */
+  /** When the visitor first needs an area (or re-enters after clearing), try device location once. */
   useEffect(() => {
     const entered = needAreaChoice && !prevNeedAreaChoiceRef.current;
     prevNeedAreaChoiceRef.current = needAreaChoice;
     if (entered) tryGeolocation();
   }, [needAreaChoice, tryGeolocation]);
 
-  const applyPreset = useCallback(
-    (lat: number, lng: number, label: string) => {
+  const selectLocation = useCallback(
+    (loc: StoredViewerLocation) => {
       geoEpochRef.current += 1;
-      persist({ lat, lng, label });
+      persist(loc);
       setPickerOpen(false);
     },
     [persist],
   );
 
   const openPicker = useCallback(() => {
-    if (!isMember) return;
     setPickerOpen(true);
-  }, [isMember]);
+  }, []);
 
   const headerTaglineRight = useMemo(() => {
-    if (!isMember) return "Dance fitness · India";
     if (!hydrated) return "Dance fitness · …";
     if (location) return `Dance fitness · ${location.label}`;
     return "Dance fitness · Choose area";
-  }, [isMember, hydrated, location]);
+  }, [hydrated, location]);
 
   const value = useMemo<MemberViewerLocationContextValue>(
     () => ({
-      isMember,
       hydrated,
       location,
       headerTaglineRight,
       openPicker,
     }),
-    [isMember, hydrated, location, headerTaglineRight, openPicker],
+    [hydrated, location, headerTaglineRight, openPicker],
   );
 
   return (
     <MemberViewerLocationContext.Provider value={value}>
       {children}
-      {isMember ? (
-        <>
-          <Dialog open={needAreaChoice}>
-            <DialogContent
-              className="sm:max-w-md [&>button.absolute]:hidden"
-              onPointerDownOutside={(e) => {
-                if (locationRef.current === null) e.preventDefault();
-              }}
-              onEscapeKeyDown={(e) => {
-                if (locationRef.current === null) e.preventDefault();
-              }}
-            >
-              <DialogHeader>
-                <DialogTitle>Where are you browsing from?</DialogTitle>
-                <DialogDescription>
-                  We use this to show instructors within about 20 km of their studio. Your browser
-                  may ask for location permission — you can also pick a city below. (India only for
-                  now.)
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  className="rounded-xl border border-border bg-card px-4 py-3 text-left text-sm font-semibold transition-colors hover:bg-muted"
-                  onClick={() => tryGeolocation()}
-                >
-                  Use my device location ({GEO_LABEL})
-                </button>
-                {MEMBER_AREA_PRESETS.map((p) => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    className="rounded-xl border border-border bg-card px-4 py-3 text-left text-sm font-semibold transition-colors hover:bg-muted"
-                    onClick={() => applyPreset(p.lat, p.lng, p.label)}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  If you don&apos;t see a browser permission prompt, check the address bar (lock /
-                  location icon) or site settings — blocked sites won&apos;t get GPS.
-                </p>
-              </div>
-            </DialogContent>
-          </Dialog>
+      <Dialog open={needAreaChoice}>
+        <DialogContent
+          className="sm:max-w-md [&>button.absolute]:hidden"
+          onPointerDownOutside={(e) => {
+            if (locationRef.current === null) e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            if (locationRef.current === null) e.preventDefault();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Where are you browsing from?</DialogTitle>
+            <DialogDescription>
+              We use this to show instructors within about 20 km of their studio. Your browser may
+              ask for location permission, pick a city below, or search for another area in India.
+            </DialogDescription>
+          </DialogHeader>
+          <ViewerLocationPickerContent
+            onSelectLocation={selectLocation}
+            onUseDeviceLocation={tryGeolocation}
+            showGpsHint
+            deviceLocationLabel="Use my device location"
+          />
+        </DialogContent>
+      </Dialog>
 
-          <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Your area</DialogTitle>
-                <DialogDescription>
-                  Update where you&apos;re browsing from. We use this to rank nearby instructors.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  className="rounded-xl border border-border bg-card px-4 py-3 text-left text-sm font-semibold transition-colors hover:bg-muted"
-                  onClick={() => {
-                    tryGeolocation();
-                  }}
-                >
-                  Use device location ({GEO_LABEL})
-                </button>
-                {MEMBER_AREA_PRESETS.map((p) => (
-                  <button
-                    key={p.label}
-                    type="button"
-                    className="rounded-xl border border-border bg-card px-4 py-3 text-left text-sm font-semibold transition-colors hover:bg-muted"
-                    onClick={() => applyPreset(p.lat, p.lng, p.label)}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </DialogContent>
-          </Dialog>
-        </>
-      ) : null}
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Your area</DialogTitle>
+            <DialogDescription>
+              Update where you&apos;re browsing from. Pick a preset, use GPS, or search for a city
+              or neighbourhood.
+            </DialogDescription>
+          </DialogHeader>
+          <ViewerLocationPickerContent
+            onSelectLocation={selectLocation}
+            onUseDeviceLocation={tryGeolocation}
+          />
+        </DialogContent>
+      </Dialog>
     </MemberViewerLocationContext.Provider>
   );
 }

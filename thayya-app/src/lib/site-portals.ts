@@ -14,7 +14,7 @@ export function allowedPortalsForUser(userType: UserType | null): PortalId[] {
 }
 
 export const portalHomeHref: Record<PortalId, string> = {
-  member: "/member/discover",
+  member: "/",
   instructor: "/instructor/today",
   admin: "/admin/overview",
 };

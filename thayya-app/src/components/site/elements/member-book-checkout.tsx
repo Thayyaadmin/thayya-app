@@ -17,7 +17,7 @@ export function MemberBookCheckout() {
   return (
     <div className="page mx-auto max-w-[1200px] px-4 py-8 md:px-8 md:py-12">
       <Link
-        href="/member/discover"
+        href="/"
         className="mb-6 flex items-center gap-1 text-sm"
         style={{ color: "var(--ink-soft)" }}
       >

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { User } from "lucide-react";
+import { ChevronDown, MapPin, User } from "lucide-react";
 import type { PortalId } from "@/lib/site-portals";
 import { portalHomeHref, portalLabel } from "@/lib/site-portals";
 import { supabase } from "@/app/supabaseClient";
@@ -18,12 +18,16 @@ export type SiteHeaderProps = {
 
 export function SiteHeader({ allowedPortals, userEmail, isAuthenticated }: SiteHeaderProps) {
   const pathname = usePathname();
-  const { isMember, headerTaglineRight, openPicker } = useMemberViewerLocation();
+  const { location, openPicker } = useMemberViewerLocation();
+  const areaLabel = location?.label ?? "Set location";
+  const areaAriaLabel = location
+    ? `Browsing area: ${location.label}. Click to change.`
+    : "Choose your browsing area";
   const activePortal: PortalId | null = pathname.startsWith("/admin")
     ? "admin"
     : pathname.startsWith("/instructor")
       ? "instructor"
-      : pathname.startsWith("/member")
+      : pathname === "/" || pathname.startsWith("/member")
         ? "member"
         : null;
 
@@ -33,7 +37,7 @@ export function SiteHeader({ allowedPortals, userEmail, isAuthenticated }: SiteH
       console.error("Error signing out:", error.message);
       return;
     }
-    window.location.href = "/member/discover";
+    window.location.href = "/";
   };
 
   const label = userEmail ?? "User account";
@@ -45,7 +49,7 @@ export function SiteHeader({ allowedPortals, userEmail, isAuthenticated }: SiteH
     >
       <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-4 py-3 md:px-6">
         <div className="flex items-center gap-3">
-          <Link href="/member/discover" className="flex shrink-0 items-center">
+          <Link href="/" className="flex shrink-0 items-center">
             <Image
               src="/Logo.png"
               alt="Thayya Official Logo"
@@ -125,24 +129,33 @@ export function SiteHeader({ allowedPortals, userEmail, isAuthenticated }: SiteH
         >
           Move · Rise · Shine
         </div>
-        {isMember ? (
-          <button
-            type="button"
-            onClick={openPicker}
-            className="max-w-[min(100%,14rem)] cursor-pointer truncate text-left text-[10px] uppercase tracking-wider underline-offset-2 hover:underline md:max-w-none md:text-[11px]"
-            style={{ color: "var(--ink-muted)" }}
-            title="Change your browsing area"
-          >
-            {headerTaglineRight}
-          </button>
-        ) : (
-          <div
-            className="text-[10px] uppercase tracking-wider md:text-[11px]"
-            style={{ color: "var(--ink-muted)" }}
-          >
-            Dance fitness · India
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={openPicker}
+          className="group flex shrink-0 items-center justify-end gap-1 text-[10px] font-medium uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 md:text-[11px]"
+          style={{ color: "var(--ink-muted)", outlineColor: "var(--ink-soft)" }}
+          aria-label={areaAriaLabel}
+        >
+          <span className="hidden tracking-[0.2em] sm:inline">Dance fitness ·</span>
+          <span className="inline-flex items-center gap-1 tracking-wide">
+            <MapPin
+              className="h-3 w-3 shrink-0 transition-colors group-hover:text-[var(--t-teal)]"
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            <span
+              className="max-w-[10.5rem] truncate underline decoration-dotted underline-offset-[3px] transition-colors group-hover:text-[var(--ink)] sm:max-w-none"
+              style={{ textDecorationColor: "var(--line)" }}
+            >
+              {areaLabel}
+            </span>
+            <ChevronDown
+              className="h-3 w-3 shrink-0 opacity-50 transition-[opacity,transform] group-hover:translate-y-px group-hover:opacity-80"
+              strokeWidth={2}
+              aria-hidden
+            />
+          </span>
+        </button>
       </div>
     </header>
   );

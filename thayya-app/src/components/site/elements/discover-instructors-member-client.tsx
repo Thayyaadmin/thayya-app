@@ -8,13 +8,12 @@ import { fetchDiscoverInstructorsBrowser } from "@/lib/discover-instructors-brow
 import { useMemberViewerLocation } from "@/contexts/member-viewer-location-context";
 
 export function DiscoverInstructorsMemberClient() {
-  const { location, hydrated, isMember } = useMemberViewerLocation();
+  const { location, hydrated } = useMemberViewerLocation();
   const [instructors, setInstructors] = useState<DiscoverInstructorRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!isMember) return;
     let cancelled = false;
 
     async function load() {
@@ -39,14 +38,16 @@ export function DiscoverInstructorsMemberClient() {
     return () => {
       cancelled = true;
     };
-  }, [isMember, hydrated, location]);
+  }, [hydrated, location]);
+
+  const areaEyebrow = location?.label ?? "Your area";
 
   if (!hydrated) {
     return (
       <div className="mb-12">
         <div className="mb-6 flex items-end justify-between">
           <div>
-            <SiteEyebrow className="mb-1">Near you</SiteEyebrow>
+            <SiteEyebrow className="mb-1">{areaEyebrow}</SiteEyebrow>
             <h2 className="font-display text-2xl font-bold md:text-3xl">Instructors near you</h2>
           </div>
         </div>
@@ -79,7 +80,7 @@ export function DiscoverInstructorsMemberClient() {
       <div className="mb-12">
         <div className="mb-6 flex items-end justify-between">
           <div>
-            <SiteEyebrow className="mb-1">Near you</SiteEyebrow>
+            <SiteEyebrow className="mb-1">{areaEyebrow}</SiteEyebrow>
             <h2 className="font-display text-2xl font-bold md:text-3xl">Instructors near you</h2>
           </div>
         </div>
@@ -94,7 +95,7 @@ export function DiscoverInstructorsMemberClient() {
     <div className="mb-12">
       <div className="mb-6 flex items-end justify-between">
         <div>
-          <SiteEyebrow className="mb-1">Within ~20 km · {location.label}</SiteEyebrow>
+          <SiteEyebrow className="mb-1">{location.label}</SiteEyebrow>
           <h2 className="font-display text-2xl font-bold md:text-3xl">Instructors near you</h2>
         </div>
       </div>
