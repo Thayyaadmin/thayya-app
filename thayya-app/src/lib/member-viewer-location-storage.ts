@@ -3,7 +3,7 @@ export const MEMBER_VIEWER_LOCATION_KEY = "thayya_member_viewer_location_v1";
 export type StoredViewerLocation = {
   lat: number;
   lng: number;
-  /** Short label for header, e.g. "Bangalore" or "Near you" */
+  /** Short label for header, e.g. "Bangalore" or "Coimbatore, Tamil Nadu" */
   label: string;
 };
 

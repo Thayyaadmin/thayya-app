@@ -15,10 +15,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="min-h-screen">
-      <MemberViewerLocationProvider
-        userType={profile?.user_type ?? null}
-        isAuthenticated={!!user}
-      >
+      <MemberViewerLocationProvider>
         <SiteHeader
           allowedPortals={allowedPortals}
           userEmail={user?.email ?? null}
