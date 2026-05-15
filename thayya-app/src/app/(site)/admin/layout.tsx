@@ -13,7 +13,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
   const profile = await getProfileById(supabase, user.id);
   if (profile?.user_type !== "admin") {
-    redirect("/member/discover");
+    redirect("/");
   }
   return <AdminPortalShell>{children}</AdminPortalShell>;
 }
