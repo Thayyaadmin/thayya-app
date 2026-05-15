@@ -25,7 +25,10 @@ export type WorkshopRow = {
   status: WorkshopStatus
   price: number | null
   slots: number
-  /** Filled when the list API returns it (optional until backend adds the field). */
+  tags: string[]
+  spots_taken: number
+  spots_remaining: number
+  is_full: boolean
   venue_name: string | null
   address_line: string | null
   city: string | null
@@ -104,6 +107,20 @@ function mapDbRowToWorkshop(row: Record<string, unknown>): WorkshopRow | null {
     if (Number.isInteger(n) && n >= 1) slots = n
   }
 
+  const tags = Array.isArray(row.tags)
+    ? row.tags.map((t) => String(t).trim()).filter(Boolean)
+    : []
+
+  const rawTaken = row.spots_taken
+  let spots_taken = 0
+  if (rawTaken !== null && rawTaken !== undefined && rawTaken !== "") {
+    const n = typeof rawTaken === "number" ? rawTaken : Number(rawTaken)
+    if (Number.isInteger(n) && n >= 0) spots_taken = n
+  }
+  const spots_remaining = Math.max(0, slots - spots_taken)
+  const is_full =
+    row.is_full === true || (slots > 0 && spots_taken >= slots)
+
   const venue_name =
     row.venue_name != null && String(row.venue_name).trim() ? String(row.venue_name).trim() : null
   const address_line =
@@ -130,6 +147,10 @@ function mapDbRowToWorkshop(row: Record<string, unknown>): WorkshopRow | null {
     status: deriveStatus(dateIso),
     price,
     slots,
+    tags,
+    spots_taken,
+    spots_remaining,
+    is_full,
     venue_name,
     address_line,
     city,
@@ -185,14 +206,21 @@ function buildWorkshopGlanceSubtitle(w: WorkshopRow): string {
   const time = formatWorkshopTime(w.dateIso)
   const venue = formatPrimaryVenueLine(w)
   const price = formatInr(w.price)
-  const spots = `${w.slots} spot${w.slots === 1 ? "" : "s"}`
-
   const head: string[] = []
   if (time) head.push(time)
   if (venue) head.push(`at ${venue}`)
   const headStr = head.join(" ")
-  const tail = [price, spots].join(" · ")
-  return headStr ? `${headStr} · ${tail}` : tail
+  const tail = price
+  return headStr ? (tail ? `${headStr} · ${tail}` : headStr) : tail || "—"
+}
+
+function formatSpotsFilledLabel(w: WorkshopRow): string {
+  return `${w.spots_taken} of ${w.slots} spot${w.slots === 1 ? "" : "s"} filled`
+}
+
+function spotsFilledPercent(w: WorkshopRow): number {
+  if (w.slots <= 0) return 0
+  return Math.min(100, Math.round((w.spots_taken / w.slots) * 100))
 }
 
 /** Short label for the top-right pill (mirrors instructor “In 4 hours” glance). */
@@ -428,11 +456,33 @@ export function WorkshopsTable({ refreshToken = 0, onEdit }: WorkshopsTableProps
                           ) : (
                             <div className="mb-4" />
                           )}
-                          <div className="bg-muted h-2 overflow-hidden rounded-full" aria-hidden>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between gap-2 text-xs">
+                              <span className="text-muted-foreground font-medium">
+                                {formatSpotsFilledLabel(workshop)}
+                              </span>
+                              {workshop.is_full ? (
+                                <span
+                                  className="shrink-0 font-bold"
+                                  style={{ color: "var(--t-red)" }}
+                                >
+                                  Full
+                                </span>
+                              ) : null}
+                            </div>
                             <div
-                              className="gradient-bg-warm h-full rounded-full opacity-35"
-                              style={{ width: "100%" }}
-                            />
+                              className="bg-muted h-2 overflow-hidden rounded-full"
+                              role="progressbar"
+                              aria-valuenow={workshop.spots_taken}
+                              aria-valuemin={0}
+                              aria-valuemax={workshop.slots}
+                              aria-label={formatSpotsFilledLabel(workshop)}
+                            >
+                              <div
+                                className="gradient-bg-warm h-full rounded-full transition-[width] duration-300 ease-out"
+                                style={{ width: `${spotsFilledPercent(workshop)}%` }}
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>

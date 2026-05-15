@@ -8,6 +8,7 @@ export type PublicWorkshop = {
   date: string | null;
   price: number | string | null;
   slots: number;
+  tags: string[];
   spots_taken: number;
   spots_remaining: number;
   is_full: boolean;

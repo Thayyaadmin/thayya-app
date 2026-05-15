@@ -25,7 +25,7 @@ function normalizeSlug(raw: string | null): string | null {
 }
 
 const WORKSHOP_SELECT =
-  "id, slug, title, date, price, slots, instructor_id, instructor, location, venue_name, address_line, city, state, country, created_at, updated_at, instructor_profile:profiles!instructor_id(id, full_name, slug, avatar_url, bio, user_type)";
+  "id, slug, title, date, price, slots, tags, instructor_id, instructor, location, venue_name, address_line, city, state, country, created_at, updated_at, instructor_profile:profiles!instructor_id(id, full_name, slug, avatar_url, bio, user_type)";
 
 type WorkshopRow = {
   id: string;
@@ -34,6 +34,7 @@ type WorkshopRow = {
   date: string | null;
   price: number | string | null;
   slots: number;
+  tags: string[] | null;
   instructor_id: string;
   instructor: string | null;
   location: unknown;
@@ -94,6 +95,7 @@ function buildWorkshopPayload(
     date: row.date,
     price: row.price,
     slots,
+    tags: Array.isArray(row.tags) ? row.tags.filter((t) => typeof t === "string") : [],
     spots_taken: taken,
     spots_remaining: spotsRemaining,
     is_full: taken >= slots,

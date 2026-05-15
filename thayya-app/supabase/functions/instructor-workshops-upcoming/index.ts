@@ -41,5 +41,43 @@ Deno.serve(async (req: Request) => {
     return Response.json({ error: error.message }, { status: 500, headers: corsHeaders });
   }
 
-  return Response.json({ workshops: data ?? [] }, { headers: corsHeaders });
+  const rows = data ?? [];
+  const workshopIds = rows.map((w) => w.id as string).filter(Boolean);
+
+  const takenByWorkshop = new Map<string, number>();
+  if (workshopIds.length > 0) {
+    const { data: registrations, error: regErr } = await admin
+      .from("workshop_registrations")
+      .select("workshop_id")
+      .in("workshop_id", workshopIds)
+      .eq("status", "active");
+
+    if (regErr) {
+      console.error(`[${LOG}] registration counts`, regErr.message);
+      return Response.json(
+        { error: regErr.message },
+        { status: 500, headers: corsHeaders },
+      );
+    }
+
+    for (const row of registrations ?? []) {
+      const wid = row.workshop_id as string;
+      takenByWorkshop.set(wid, (takenByWorkshop.get(wid) ?? 0) + 1);
+    }
+  }
+
+  const workshops = rows.map((row) => {
+    const id = row.id as string;
+    const slots = typeof row.slots === "number" ? row.slots : 0;
+    const taken = takenByWorkshop.get(id) ?? 0;
+    const remaining = Math.max(0, slots - taken);
+    return {
+      ...row,
+      spots_taken: taken,
+      spots_remaining: remaining,
+      is_full: slots > 0 && taken >= slots,
+    };
+  });
+
+  return Response.json({ workshops }, { headers: corsHeaders });
 });

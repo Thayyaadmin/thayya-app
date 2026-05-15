@@ -64,6 +64,21 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
   return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
+/** Undated workshops stay listed; dated workshops must start at or after now (time-aware). */
+function isWorkshopUpcoming(dateValue: unknown, nowMs: number): boolean {
+  if (dateValue == null || dateValue === "") return true;
+  const when = new Date(String(dateValue));
+  if (!Number.isFinite(when.getTime())) return true;
+  return when.getTime() >= nowMs;
+}
+
+function filterUpcomingWorkshops(
+  rows: Record<string, unknown>[],
+  nowMs: number,
+): Record<string, unknown>[] {
+  return rows.filter((row) => isWorkshopUpcoming(row.date, nowMs));
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -94,12 +109,15 @@ Deno.serve(async (req: Request) => {
 
   const reqUrl = new URL(req.url);
   const viewer = parseViewerPoint(reqUrl);
+  const nowIso = new Date().toISOString();
+  const nowMs = Date.now();
 
   if (viewer) {
     const { data, error } = await admin
       .from("workshops")
       .select(WORKSHOP_SELECT)
       .not("location", "is", null)
+      .or(`date.is.null,date.gte.${nowIso}`)
       .limit(NEARBY_FETCH_CAP);
 
     if (error) {
@@ -110,7 +128,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const rows = (data ?? []) as Record<string, unknown>[];
+    const rows = filterUpcomingWorkshops(
+      (data ?? []) as Record<string, unknown>[],
+      nowMs,
+    );
     const ranked = rows
       .map((row) => {
         const c = coordsFromPoint(row.location);
@@ -138,6 +159,7 @@ Deno.serve(async (req: Request) => {
   const { data, error } = await admin
     .from("workshops")
     .select(WORKSHOP_SELECT)
+    .or(`date.is.null,date.gte.${nowIso}`)
     .order("date", { ascending: true, nullsFirst: false })
     .limit(FEATURED_LIMIT);
 
@@ -149,7 +171,10 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const workshops = data ?? [];
+  const workshops = filterUpcomingWorkshops(
+    (data ?? []) as Record<string, unknown>[],
+    nowMs,
+  );
 
   return Response.json(
     { workshops, search: "featured" as const },

@@ -1,6 +1,7 @@
 "use client"
 
-import { useActionState, useEffect, useMemo, useState } from "react"
+import { useActionState, useEffect, useMemo, useState, type KeyboardEvent } from "react"
+import { X } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -16,6 +17,11 @@ import { saveWorkshop, type WorkshopActionState } from "@/app/dashboard/workshop
 import type { WorkshopRow } from "@/components/dashboard/workshops-table"
 import { PrimaryLocationField } from "@/components/auth/PrimaryLocationField"
 import type { PrimaryLocationPayload } from "@/lib/primary-location"
+import {
+  MAX_WORKSHOP_TAG_LENGTH,
+  MAX_WORKSHOP_TAGS,
+  normalizeWorkshopTags,
+} from "@/lib/workshop-tags"
 
 const initialState: WorkshopActionState = { ok: false }
 
@@ -63,6 +69,8 @@ export function WorkshopFormDialog({
   const [venuePoint, setVenuePoint] = useState<WorkshopVenuePoint | null>(null)
   const [addr, setAddr] = useState<Addr>(emptyAddr)
   const [slots, setSlots] = useState(20)
+  const [tags, setTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState("")
 
   const defaultDate = useMemo(
     () => (mode === "edit" && initial?.dateIso ? toDatetimeLocalValue(initial.dateIso) : ""),
@@ -73,6 +81,8 @@ export function WorkshopFormDialog({
     if (!open) return
     if (mode === "edit" && initial) {
       setSlots(initial.slots)
+      setTags(initial.tags ?? [])
+      setTagInput("")
       setAddr({
         venue_name: initial.venue_name ?? "",
         address_line: initial.address_line ?? "",
@@ -100,10 +110,26 @@ export function WorkshopFormDialog({
       }
     } else {
       setSlots(20)
+      setTags([])
+      setTagInput("")
       setAddr(emptyAddr)
       setVenuePoint(null)
     }
   }, [open, mode, initial])
+
+  const addTagFromInput = () => {
+    const draft = tagInput.trim()
+    if (!draft) return
+    setTags((prev) => normalizeWorkshopTags([...prev, draft]))
+    setTagInput("")
+  }
+
+  const onTagInputKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      addTagFromInput()
+    }
+  }
 
   useEffect(() => {
     if (state.ok) {
@@ -145,6 +171,7 @@ export function WorkshopFormDialog({
           <input type="hidden" name="intent" value={mode === "create" ? "create" : "update"} />
           {mode === "edit" && initial ? <input type="hidden" name="id" value={initial.id} /> : null}
           <input type="hidden" name="location_json" value={locationHiddenValue} readOnly />
+          <input type="hidden" name="tags_json" value={JSON.stringify(tags)} readOnly />
 
           <div className="grid gap-2">
             <Label htmlFor="wf-title">Title</Label>
@@ -196,6 +223,55 @@ export function WorkshopFormDialog({
               }}
             />
             <p className="text-xs text-muted-foreground">Maximum participants (default 20).</p>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="wf-tags">Tags</Label>
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs font-medium"
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    className="rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label={`Remove tag ${tag}`}
+                    onClick={() => setTags((prev) => prev.filter((t) => t !== tag))}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                id="wf-tags"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={onTagInputKeyDown}
+                placeholder="e.g. bollywood, beginner"
+                maxLength={MAX_WORKSHOP_TAG_LENGTH}
+                disabled={tags.length >= MAX_WORKSHOP_TAGS || isPending}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                disabled={
+                  !tagInput.trim() || tags.length >= MAX_WORKSHOP_TAGS || isPending
+                }
+                onClick={addTagFromInput}
+              >
+                Add
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Up to {MAX_WORKSHOP_TAGS} tags, {MAX_WORKSHOP_TAG_LENGTH} characters each. Press Enter
+              or Add.
+            </p>
           </div>
 
           <div className="grid gap-2">

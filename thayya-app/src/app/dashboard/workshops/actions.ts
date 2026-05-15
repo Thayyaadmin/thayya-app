@@ -7,6 +7,7 @@ import {
   type SaveWorkshopGeoJsonPoint,
   type SaveWorkshopRequestBody,
 } from '@/lib/save-workshop-api';
+import { parseWorkshopTagsField } from '@/lib/workshop-tags';
 
 export type WorkshopActionState = { ok: boolean; error?: string };
 
@@ -71,6 +72,7 @@ async function saveWorkshopThroughRls(
     city: body.city ?? null,
     state: body.state ?? null,
     country: body.country ?? null,
+    tags: body.tags ?? [],
   };
 
   if (body.intent === 'update') {
@@ -140,6 +142,7 @@ export async function saveWorkshop(
   const city = optionalText(formData.get('city'));
   const state = optionalText(formData.get('state'));
   const country = optionalText(formData.get('country'));
+  const tags = parseWorkshopTagsField(formData.get('tags_json'));
 
   const baseBody: SaveWorkshopRequestBody = {
     intent,
@@ -153,6 +156,7 @@ export async function saveWorkshop(
     city,
     state,
     country,
+    tags,
   };
 
   const body: SaveWorkshopRequestBody =
