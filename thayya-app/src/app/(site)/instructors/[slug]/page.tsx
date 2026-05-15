@@ -4,11 +4,13 @@ import { ChevronLeft, BadgeCheck } from "lucide-react";
 import type { Metadata } from "next";
 
 import { fetchPublicInstructorBySlug } from "@/lib/instructor-public";
+import { workshopPublicPath } from "@/lib/workshop-path";
 
 type RouteParams = { slug: string };
 
 type WorkshopSummary = {
   id: string;
+  slug: string | null;
   title: string;
   date: string | null;
   price: number | null;
@@ -81,6 +83,7 @@ async function loadInstructor(slug: string) {
 
   const workshops = data.workshops.map((w) => ({
     id: w.id,
+    slug: w.slug ?? null,
     title: w.title ?? "",
     date: w.date,
     price: w.price,
@@ -227,9 +230,10 @@ export default async function InstructorPage(
           {workshops.map((ws) => {
             const price = formatPrice(ws.price);
             return (
-              <div
+              <Link
                 key={ws.id}
-                className="lift rounded-2xl p-5 text-left"
+                href={workshopPublicPath(ws)}
+                className="lift block rounded-2xl p-5 text-left"
                 style={{ background: "white", border: "1px solid var(--line)" }}
               >
                 <div className="font-display mb-1 text-lg font-bold">
@@ -243,7 +247,7 @@ export default async function InstructorPage(
                     <span className="font-display text-xl font-bold gradient-text">{price}</span>
                   </div>
                 ) : null}
-              </div>
+              </Link>
             );
           })}
         </div>

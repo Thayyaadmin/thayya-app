@@ -19,6 +19,10 @@ verify_jwt = false
 [functions.discover-workshops]
 verify_jwt = false
 
+# Public single-workshop detail by uuid (?id=); service role read, no session required.
+[functions.workshop-public]
+verify_jwt = false
+
 # Requires a valid Supabase session JWT (Authorization: Bearer …).
 [functions.register-user-profile]
 verify_jwt = true
@@ -42,4 +46,8 @@ verify_jwt = true
 # JWT: authenticated user registers themselves for a workshop. All business
 # rules (capacity, past-date, duplicate, self-registration) enforced in code.
 [functions.register-workshop]
+verify_jwt = true
+
+# JWT: signed-in member's active workshop registrations, split upcoming vs past.
+[functions.my-workshop-registrations]
 verify_jwt = true

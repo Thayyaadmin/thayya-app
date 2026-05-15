@@ -2,6 +2,7 @@ import { getSupabaseEnv } from "@/lib/supabase-env";
 
 export type DiscoverWorkshopRow = {
   id: string;
+  slug?: string | null;
   title: string | null;
   date: string | null;
   price: number | string | null;

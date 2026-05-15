@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { allocateWorkshopSlug } from "../_shared/workshop-slug.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -78,7 +79,7 @@ function textFieldForPatch(
 }
 
 const selectCols =
-  "id, title, date, price, instructor_id, instructor, slots, location, venue_name, address_line, city, state, country, created_at, updated_at";
+  "id, slug, title, date, price, instructor_id, instructor, slots, location, venue_name, address_line, city, state, country, created_at, updated_at";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -325,8 +326,18 @@ Deno.serve(async (req: Request) => {
       ? targetProfile.full_name.trim()
       : "Instructor";
 
+  let workshopSlug: string;
+  try {
+    workshopSlug = await allocateWorkshopSlug(admin, title);
+  } catch (slugErr) {
+    const msg = slugErr instanceof Error ? slugErr.message : "Could not allocate slug";
+    console.error("[save-workshop] slug", msg);
+    return Response.json({ error: msg }, { status: 500, headers: corsHeaders });
+  }
+
   const insertRow: Record<string, unknown> = {
     title,
+    slug: workshopSlug,
     date,
     price,
     instructor_id: instructorId,

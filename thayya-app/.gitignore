@@ -30,14 +30,25 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (never commit secrets; allow committed examples)
 .env*
+!.env.example
+!.env*.example
 
 # vercel
 .vercel
 
-# supabase CLI (local link / version cache — not portable, may hint project URLs)
-/supabase/.temp/
+# supabase CLI (local link / version cache — not portable, may contain project refs)
+supabase/.temp/
+
+# turbopack
+.turbo/
+
+# editors (optional local settings)
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 
 # typescript
 *.tsbuildinfo
