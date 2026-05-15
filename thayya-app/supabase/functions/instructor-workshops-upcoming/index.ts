@@ -8,7 +8,7 @@ import {
 const LOG = "instructor-workshops-upcoming";
 
 /** Same base columns as shared gate, plus profile join for dashboard display. */
-const SELECT_WITH_PROFILE = `${SELECT_COLS}, instructor_profile:profiles!instructor_id(id, full_name, user_type)`;
+const SELECT_WITH_PROFILE = `${SELECT_COLS}, instructor_profile:profiles!instructor_id(id, full_name, user_type, avatar_url)`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {

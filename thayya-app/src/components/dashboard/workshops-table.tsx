@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search, Pencil, Trash2 } from "lucide-react"
 import { supabase } from "@/app/supabaseClient"
 import { deleteWorkshop } from "@/app/dashboard/workshops/actions"
 import { toGeoJsonPoint } from "@/lib/geo-point"
 import { fetchInstructorWorkshopsUpcoming } from "@/lib/instructor-workshops-upcoming-browser"
+import { getInstructorInitials } from "@/lib/instructor-profile"
 
 export type WorkshopStatus = "active" | "upcoming" | "completed"
 
@@ -31,6 +33,8 @@ export type WorkshopRow = {
   country: string | null
   /** JSON string of `{ type: "Point", coordinates: [lng, lat] }` for the save-workshop form. */
   locationGeoJson: string | null
+  /** From joined `profiles.avatar_url` when the API returns it. */
+  instructor_avatar_url: string | null
 }
 
 function formatWorkshopDateDisplay(dateValue: string | null): string {
@@ -67,7 +71,10 @@ function mapDbRowToWorkshop(row: Record<string, unknown>): WorkshopRow | null {
   // Prefer the linked profile's full_name (source of truth). Fall back to the
   // legacy `instructor` / `instructor_name` text columns for rows that pre-date
   // the FK or were never matched during backfill.
-  const profile = row.instructor_profile as { full_name?: string | null } | null | undefined
+  const profile = row.instructor_profile as {
+    full_name?: string | null
+    avatar_url?: string | null
+  } | null | undefined
   const instructorRaw =
     (profile && typeof profile.full_name === "string" && profile.full_name) ||
     row.instructor ||
@@ -108,6 +115,12 @@ function mapDbRowToWorkshop(row: Record<string, unknown>): WorkshopRow | null {
   const geo = toGeoJsonPoint(row.location)
   const locationGeoJson = geo ? JSON.stringify(geo) : null
 
+  const rawAvatar = profile?.avatar_url
+  const instructor_avatar_url =
+    typeof rawAvatar === "string" && rawAvatar.trim().startsWith("http")
+      ? rawAvatar.trim()
+      : null
+
   return {
     id: String(row.id),
     name: title,
@@ -123,6 +136,7 @@ function mapDbRowToWorkshop(row: Record<string, unknown>): WorkshopRow | null {
     state,
     country,
     locationGeoJson,
+    instructor_avatar_url,
   }
 }
 
@@ -399,8 +413,17 @@ export function WorkshopsTable({ refreshToken = 0, onEdit }: WorkshopsTableProps
                             {buildWorkshopGlanceSubtitle(workshop)}
                           </div>
                           {workshop.instructor !== "—" ? (
-                            <div className="text-muted-foreground mb-4 text-xs font-medium sm:text-sm">
-                              Led by {workshop.instructor}
+                            <div className="text-muted-foreground mb-4 flex items-center gap-3 text-xs font-medium sm:text-sm">
+                              <Avatar className="h-10 w-10 shrink-0 border border-border/80 shadow-sm">
+                                <AvatarImage
+                                  src={workshop.instructor_avatar_url ?? undefined}
+                                  alt={workshop.instructor}
+                                />
+                                <AvatarFallback className="text-[11px] font-semibold">
+                                  {getInstructorInitials(workshop.instructor)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span>Led by {workshop.instructor}</span>
                             </div>
                           ) : (
                             <div className="mb-4" />

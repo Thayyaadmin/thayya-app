@@ -50,7 +50,18 @@ export default function InstructorDashboard() {
       const user = data.user;
       setDisplayName(getInstructorDisplayName(user));
       setEmail(user.email ?? "");
-      setAvatarUrl(getInstructorAvatarUrl(user));
+      const fromMeta = getInstructorAvatarUrl(user);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("avatar_url")
+        .eq("id", user.id)
+        .maybeSingle();
+      const fromProfile = profile?.avatar_url;
+      const fromDb =
+        typeof fromProfile === "string" && fromProfile.trim().startsWith("http")
+          ? fromProfile.trim()
+          : null;
+      setAvatarUrl(fromDb ?? fromMeta);
     })();
     return () => {
       cancelled = true;
