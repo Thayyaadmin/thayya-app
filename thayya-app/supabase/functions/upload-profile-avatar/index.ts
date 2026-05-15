@@ -225,7 +225,7 @@ Deno.serve(async (req: Request) => {
     .select(
       "id, user_type, full_name, bio, slug, avatar_url, primary_location, address_line, city, state, country, created_at, updated_at",
     )
-    .single();
+    .maybeSingle();
 
   if (updateErr) {
     console.error("[upload-profile-avatar] profile update", updateErr.message);
@@ -235,6 +235,25 @@ Deno.serve(async (req: Request) => {
       console.error("[upload-profile-avatar] rollback delete failed", delErr);
     }
     return Response.json({ error: updateErr.message }, { status: 400, headers: corsHeaders });
+  }
+
+  if (!updated) {
+    console.error(
+      "[upload-profile-avatar] profile update",
+      "no row returned (missing profiles row, RLS blocked update, or duplicate ids)",
+    );
+    try {
+      await r2.fetch(r2ObjectUrl(accountId, bucket, objectKey), { method: "DELETE" });
+    } catch (delErr) {
+      console.error("[upload-profile-avatar] rollback delete failed", delErr);
+    }
+    return Response.json(
+      {
+        error:
+          "Profile was not updated (no matching row returned). Check that a profiles row exists for your user and that RLS allows your role to update it.",
+      },
+      { status: 400, headers: corsHeaders },
+    );
   }
 
   if (previousUrl) {

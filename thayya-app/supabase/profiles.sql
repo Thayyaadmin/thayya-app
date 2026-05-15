@@ -93,6 +93,8 @@ alter table public.profiles enable row level security;
 
 drop policy if exists "profiles_select_authenticated" on public.profiles;
 drop policy if exists "profiles_update_own" on public.profiles;
+drop policy if exists "profiles_update_own_member_instructor" on public.profiles;
+drop policy if exists "profiles_update_own_admin" on public.profiles;
 drop policy if exists "profiles_insert_own" on public.profiles;
 
 -- Any signed-in user can read profiles (instructor pages, attendee lists, etc.).
@@ -102,15 +104,19 @@ create policy "profiles_select_authenticated"
   to authenticated
   using (true);
 
--- A user can update only their own profile, and cannot escalate themselves to admin.
-create policy "profiles_update_own"
+-- Own-row updates: two policies (OR) so admins can change fields like avatar_url
+-- without opening self-promotion to admin (member/instructor rows cannot set user_type to admin).
+create policy "profiles_update_own_member_instructor"
   on public.profiles for update
   to authenticated
-  using (id = auth.uid())
-  with check (
-    id = auth.uid()
-    and user_type in ('member', 'instructor')
-  );
+  using (id = auth.uid() and user_type in ('member', 'instructor'))
+  with check (id = auth.uid() and user_type in ('member', 'instructor'));
+
+create policy "profiles_update_own_admin"
+  on public.profiles for update
+  to authenticated
+  using (id = auth.uid() and user_type = 'admin')
+  with check (id = auth.uid() and user_type = 'admin');
 
 -- Inserts normally happen through the trigger (security definer), but allow self-insert
 -- as a fallback so a missing row can be created from the client without bypass keys.
