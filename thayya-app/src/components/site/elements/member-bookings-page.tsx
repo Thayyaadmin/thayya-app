@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { MemberPastBookingRow } from "@/components/site/elements/member-past-booking-row";
 import { SiteEyebrow } from "@/components/site/atoms/SiteEyebrow";
 import { formatWorkshopPrice, formatWorkshopVenue } from "@/lib/workshop-display";
 import type { MyWorkshopRegistration } from "@/lib/my-workshop-registrations";
@@ -74,10 +75,12 @@ function BookingSection({
   label,
   items,
   emptyMessage,
+  variant = "upcoming",
 }: {
   label: string;
   items: MyWorkshopRegistration[];
   emptyMessage: string;
+  variant?: "upcoming" | "past";
 }) {
   return (
     <>
@@ -100,9 +103,13 @@ function BookingSection({
         </p>
       ) : (
         <div className="mb-8 space-y-3">
-          {items.map((item) => (
-            <BookingRow key={item.registration_id} item={item} />
-          ))}
+          {items.map((item) =>
+            variant === "past" ? (
+              <MemberPastBookingRow key={item.registration_id} item={item} />
+            ) : (
+              <BookingRow key={item.registration_id} item={item} />
+            ),
+          )}
         </div>
       )}
     </>
@@ -139,6 +146,7 @@ export function MemberBookingsPage({ upcoming, past, error }: MemberBookingsPage
       <BookingSection
         label="Past"
         items={past}
+        variant="past"
         emptyMessage="No past workshops yet."
       />
     </div>

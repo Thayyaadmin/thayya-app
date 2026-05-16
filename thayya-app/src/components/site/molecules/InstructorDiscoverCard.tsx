@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getInitials, avatarVariant } from "@/lib/text-utils";
+import { InstructorRatingBadge } from "@/components/site/molecules/InstructorRatingBadge";
 
 export type InstructorDiscoverCardProps = {
   id: string;
@@ -7,6 +8,8 @@ export type InstructorDiscoverCardProps = {
   slug: string | null;
   bio: string | null;
   avatarUrl?: string | null;
+  ratingAvg?: number | null;
+  ratingCount?: number | null;
 };
 
 export function InstructorDiscoverCard({
@@ -15,6 +18,8 @@ export function InstructorDiscoverCard({
   slug,
   bio,
   avatarUrl,
+  ratingAvg,
+  ratingCount,
 }: InstructorDiscoverCardProps) {
   const variant = avatarVariant(id);
   const initials = getInitials(fullName);
@@ -44,6 +49,11 @@ export function InstructorDiscoverCard({
         )}
       </div>
       <div className="font-display text-base font-bold md:text-lg">{fullName || "Instructor"}</div>
+      <InstructorRatingBadge
+        ratingAvg={ratingAvg}
+        ratingCount={ratingCount}
+        className="mb-1"
+      />
       {bio ? (
         <div className="line-clamp-2 text-xs" style={{ color: "var(--ink-muted)" }}>
           {bio}

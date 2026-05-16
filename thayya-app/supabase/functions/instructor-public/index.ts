@@ -1,5 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+import { fetchInstructorRatingSummaries } from "../_shared/instructor-ratings.ts";
+
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -88,9 +90,15 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  const ratingSummaries = await fetchInstructorRatingSummaries(admin, [profile.id]);
+  const rating = ratingSummaries.get(profile.id) ?? {
+    rating_avg: null,
+    rating_count: 0,
+  };
+
   return Response.json(
     {
-      profile,
+      profile: { ...profile, ...rating },
       workshops: workshops ?? [],
     },
     { headers: corsHeaders },

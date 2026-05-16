@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
+
 import {
   corsHeaders,
   requireAuthenticatedUser,
@@ -67,6 +69,8 @@ type RegistrationRow = {
 export type RegistrationListItem = {
   registration_id: string;
   registered_at: string;
+  /** User's 1–5 rating when they reviewed this past workshop (past list only). */
+  review_rating?: number | null;
   workshop: {
     id: string;
     slug: string | null;
@@ -168,6 +172,46 @@ function sortPastNearest(
   return compareRegisteredAt(a, b);
 }
 
+type ReviewLookupRow = { workshop_id: string; rating: number };
+
+async function fetchUserReviewRatings(
+  admin: SupabaseClient,
+  userId: string,
+  workshopIds: string[],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (workshopIds.length === 0) return map;
+
+  const { data, error } = await admin
+    .from("workshop_reviews")
+    .select("workshop_id, rating")
+    .eq("user_id", userId)
+    .in("workshop_id", workshopIds);
+
+  if (error) {
+    console.error(`[${LOG}] reviews`, error.message);
+    return map;
+  }
+
+  for (const row of (data ?? []) as ReviewLookupRow[]) {
+    const rating = Number(row.rating);
+    if (row.workshop_id && Number.isFinite(rating)) {
+      map.set(row.workshop_id, rating);
+    }
+  }
+  return map;
+}
+
+function attachReviewRatings(
+  items: RegistrationListItem[],
+  reviews: Map<string, number>,
+): RegistrationListItem[] {
+  return items.map((item) => ({
+    ...item,
+    review_rating: reviews.get(item.workshop.id) ?? null,
+  }));
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -208,9 +252,13 @@ Deno.serve(async (req: Request) => {
     .filter((item) => isUpcoming(item.workshop.date, nowMs))
     .sort(sortUpcomingNearest);
 
-  const past = mapped
+  const pastFiltered = mapped
     .filter((item) => !isUpcoming(item.workshop.date, nowMs))
     .sort(sortPastNearest);
+
+  const pastWorkshopIds = pastFiltered.map((item) => item.workshop.id);
+  const reviewRatings = await fetchUserReviewRatings(admin, user.id, pastWorkshopIds);
+  const past = attachReviewRatings(pastFiltered, reviewRatings);
 
   return Response.json({ upcoming, past }, { headers: corsHeaders });
 });

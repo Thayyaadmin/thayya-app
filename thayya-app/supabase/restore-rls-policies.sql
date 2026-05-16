@@ -3,8 +3,8 @@
 -- Idempotent — safe to re-run.
 --
 -- Covers: public.profiles, public.workshops, public.workshop_registrations,
---         public.categories, public.profile_categories
--- (workshop_registrations has RLS ON and zero policies by design — edge functions use service role.)
+--         public.workshop_reviews, public.categories, public.profile_categories
+-- (workshop_registrations / workshop_reviews have RLS ON and zero policies by design — edge functions use service role.)
 --
 -- If you had custom policies on other tables, restore those separately.
 
@@ -120,6 +120,12 @@ create policy "workshops_delete_own_instructor"
 -- =============================================================================
 
 alter table public.workshop_registrations enable row level security;
+
+-- =============================================================================
+-- public.workshop_reviews — RLS on, no policies (Edge Functions use service role)
+-- =============================================================================
+
+alter table public.workshop_reviews enable row level security;
 
 -- =============================================================================
 -- public.categories — RLS on, no policies (Edge Functions use service role)

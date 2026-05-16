@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ChevronLeft, BadgeCheck } from "lucide-react";
 import type { Metadata } from "next";
 
+import { InstructorRatingBadge } from "@/components/site/molecules/InstructorRatingBadge";
 import { fetchPublicInstructorBySlug } from "@/lib/instructor-public";
 import { workshopPublicPath } from "@/lib/workshop-path";
 
@@ -183,6 +184,13 @@ export default async function InstructorPage(
             ) : null}
             <span className="gradient-text">{nameGradient}</span>
           </h1>
+          <div className="mb-4">
+            <InstructorRatingBadge
+              ratingAvg={profile.rating_avg}
+              ratingCount={profile.rating_count}
+              size="md"
+            />
+          </div>
           <p className="mb-6 text-base leading-relaxed" style={{ color: "var(--ink-soft)" }}>
             {bio}
           </p>

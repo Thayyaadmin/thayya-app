@@ -1,6 +1,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import postgres from "npm:postgres@3";
 
+import {
+  attachRatingToInstructor,
+  fetchInstructorRatingSummaries,
+} from "../_shared/instructor-ratings.ts";
+
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -115,7 +120,7 @@ Deno.serve(async (req: Request) => {
         limit ${MAX_RESULTS}
       `) as unknown as NearbyInstructorRow[];
 
-      const instructors: InstructorRow[] = rows.map((row) => ({
+      const baseInstructors: InstructorRow[] = rows.map((row) => ({
         id: row.id,
         full_name: row.full_name,
         slug: row.slug,
@@ -123,6 +128,17 @@ Deno.serve(async (req: Request) => {
         user_type: row.user_type,
         avatar_url: row.avatar_url ?? null,
       }));
+
+      const admin = createClient(url, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const ratingSummaries = await fetchInstructorRatingSummaries(
+        admin,
+        baseInstructors.map((i) => i.id),
+      );
+      const instructors = baseInstructors.map((inst) =>
+        attachRatingToInstructor(inst, ratingSummaries),
+      );
 
       return Response.json(
         {
@@ -162,7 +178,14 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const instructors = (data ?? []) as InstructorRow[];
+  const baseInstructors = (data ?? []) as InstructorRow[];
+  const ratingSummaries = await fetchInstructorRatingSummaries(
+    admin,
+    baseInstructors.map((i) => i.id),
+  );
+  const instructors = baseInstructors.map((inst) =>
+    attachRatingToInstructor(inst, ratingSummaries),
+  );
 
   return Response.json(
     { instructors, search: "featured" as const },

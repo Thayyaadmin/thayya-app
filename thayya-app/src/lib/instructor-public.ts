@@ -7,6 +7,8 @@ export type PublicInstructorProfile = {
   bio: string | null;
   slug: string | null;
   avatar_url: string | null;
+  rating_avg: number | null;
+  rating_count: number;
 };
 
 export type PublicInstructorWorkshop = {
@@ -64,8 +66,20 @@ export async function fetchPublicInstructorBySlug(
       return { data: null, error: "Invalid response from instructor-public." };
     }
 
+    const profile: PublicInstructorProfile = {
+      ...payload.profile,
+      rating_avg:
+        typeof payload.profile.rating_avg === "number"
+          ? payload.profile.rating_avg
+          : null,
+      rating_count:
+        typeof payload.profile.rating_count === "number"
+          ? payload.profile.rating_count
+          : 0,
+    };
+
     return {
-      data: { profile: payload.profile, workshops: payload.workshops },
+      data: { profile, workshops: payload.workshops },
       error: null,
     };
   } catch (e) {

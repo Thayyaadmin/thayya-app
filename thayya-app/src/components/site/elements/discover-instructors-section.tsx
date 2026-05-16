@@ -34,6 +34,8 @@ export function DiscoverInstructorsSection({ instructors, error }: DiscoverInstr
               slug={inst.slug}
               bio={inst.bio}
               avatarUrl={inst.avatar_url}
+              ratingAvg={inst.rating_avg}
+              ratingCount={inst.rating_count}
             />
           ))}
         </div>

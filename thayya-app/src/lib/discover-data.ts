@@ -24,6 +24,8 @@ export type DiscoverInstructorRow = {
   user_type: string;
   /** Public profile image URL when set (from discover-instructors API). */
   avatar_url: string | null;
+  rating_avg: number | null;
+  rating_count: number;
 };
 
 export type FetchDiscoverInstructorsOptions = {
