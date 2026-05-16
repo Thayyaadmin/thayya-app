@@ -22,7 +22,7 @@ export function DiscoverInstructorsSection({ instructors, error }: DiscoverInstr
         </p>
       ) : instructors.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--ink-muted)" }}>
-          No instructors are on Thayya yet. Sign up as an instructor to be the first.
+          No instructors are on Thayya yet. Check back soon.
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">

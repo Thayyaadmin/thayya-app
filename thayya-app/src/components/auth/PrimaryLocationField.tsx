@@ -10,6 +10,8 @@ export type { PrimaryLocationPayload };
 type PrimaryLocationFieldProps = {
   onChange: (payload: PrimaryLocationPayload | null) => void;
   disabled?: boolean;
+  /** Pre-fill search input when editing an existing profile. */
+  initialLocation?: PrimaryLocationPayload | null;
   /** Override default instructor signup copy (e.g. workshop venue). */
   label?: string;
   description?: string;
@@ -80,6 +82,7 @@ const DEFAULT_DESCRIPTION =
 export function PrimaryLocationField({
   onChange,
   disabled,
+  initialLocation = null,
   label = DEFAULT_LABEL,
   description = DEFAULT_DESCRIPTION,
   inputId = "primaryLocation",
@@ -108,6 +111,13 @@ export function PrimaryLocationField({
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
+
+  useEffect(() => {
+    if (!initialLocation) return;
+    selectedLabelRef.current = initialLocation.formattedLabel;
+    setQuery(initialLocation.formattedLabel);
+    onChangeRef.current(initialLocation);
+  }, [initialLocation]);
 
   const open = Boolean(!disabled && query.trim() && (loading || predictions.length > 0));
 

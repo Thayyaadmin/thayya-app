@@ -51,3 +51,15 @@ verify_jwt = true
 # JWT: signed-in member's active workshop registrations, split upcoming vs past.
 [functions.my-workshop-registrations]
 verify_jwt = true
+
+# JWT: admin only — create or promote instructor accounts (service role in function).
+[functions.admin-create-instructor]
+verify_jwt = true
+
+# Public read: active category catalog (service role in function).
+[functions.categories-active]
+verify_jwt = false
+
+# JWT: admin list/get/update instructors (service role in function).
+[functions.admin-instructors]
+verify_jwt = true

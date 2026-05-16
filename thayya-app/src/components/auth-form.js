@@ -1,25 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, User as UserIcon } from "lucide-react";
 import { supabase } from "@/app/supabaseClient";
 import { registerUserProfile } from "@/lib/register-user-profile";
-
-const PrimaryLocationField = dynamic(
-  () =>
-    import("@/components/auth/PrimaryLocationField").then((mod) => ({
-      default: mod.PrimaryLocationField,
-    })),
-  {
-    ssr: false,
-    loading: () => (
-      <p className="text-xs text-muted-foreground">Loading location search…</p>
-    ),
-  },
-);
 
 function safeNextPath(next) {
   if (!next || typeof next !== "string") return "/";
@@ -28,19 +14,6 @@ function safeNextPath(next) {
   if (trimmed.includes("\\")) return "/";
   return trimmed;
 }
-
-const USER_TYPES = [
-  {
-    id: "member",
-    label: "Member",
-    description: "Book workshops and dance with the tribe.",
-  },
-  {
-    id: "instructor",
-    label: "Instructor",
-    description: "Host workshops and grow your following.",
-  },
-];
 
 const BIO_MAX_LENGTH = 280;
 
@@ -52,9 +25,7 @@ export function AuthForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState("");
-  const [userType, setUserType] = useState("member");
   const [bio, setBio] = useState("");
-  const [instructorLocation, setInstructorLocation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [formMessage, setFormMessage] = useState("");
@@ -63,7 +34,6 @@ export function AuthForm() {
     setMode(nextMode);
     setFormError("");
     setFormMessage("");
-    setInstructorLocation(null);
   };
 
   const handleSubmit = async (e) => {
@@ -89,20 +59,9 @@ export function AuthForm() {
       if (!trimmedName) {
         throw new Error("Please tell us your name so others know who you are.");
       }
-      if (!USER_TYPES.some((t) => t.id === userType)) {
-        throw new Error("Please choose whether you're signing up as a Member or an Instructor.");
-      }
       const trimmedBio = bio.trim();
       if (trimmedBio.length > BIO_MAX_LENGTH) {
         throw new Error(`Bio must be ${BIO_MAX_LENGTH} characters or fewer.`);
-      }
-
-      if (userType === "instructor") {
-        if (!instructorLocation) {
-          throw new Error(
-            "Please choose your primary location of operation from the suggestions (with city and country)."
-          );
-        }
       }
 
       const { data, error } = await supabase.auth.signUp({
@@ -111,9 +70,6 @@ export function AuthForm() {
         options: {
           data: {
             full_name: trimmedName,
-            user_type: userType,
-            // Keep both keys around — handle_new_user reads `bio`, while other Supabase
-            // integrations sometimes surface `name`/`description`.
             name: trimmedName,
             bio: trimmedBio || null,
           },
@@ -124,37 +80,16 @@ export function AuthForm() {
 
       if (data?.session) {
         const token = data.session.access_token;
-        const bioPayload = trimmedBio || null;
-        if (userType === "instructor") {
-          await registerUserProfile(token, {
-            full_name: trimmedName,
-            user_type: "instructor",
-            bio: bioPayload,
-            primary_location: instructorLocation.primary_location,
-            city: instructorLocation.city,
-            country: instructorLocation.country,
-            address_line: instructorLocation.address_line,
-            state: instructorLocation.state,
-          });
-        } else {
-          await registerUserProfile(token, {
-            full_name: trimmedName,
-            user_type: "member",
-            bio: bioPayload,
-          });
-        }
+        await registerUserProfile(token, {
+          full_name: trimmedName,
+          bio: trimmedBio || null,
+        });
         router.push(safeNextPath(searchParams.get("next")));
         router.refresh();
         return;
       }
 
-      if (userType === "instructor") {
-        setFormMessage(
-          "Signup successful. Please check your email to confirm your account. After you sign in, set your primary teaching location from your profile (required for instructors) — it could not be saved until your email is confirmed."
-        );
-      } else {
-        setFormMessage("Signup successful. Please check your email to confirm.");
-      }
+      setFormMessage("Signup successful. Please check your email to confirm.");
     } catch (error) {
       const message = error?.message || "Something went wrong. Please try again.";
       if (message.includes("Invalid path specified in request URL")) {
@@ -226,66 +161,25 @@ export function AuthForm() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {isSignup && (
-            <>
-              <div className="space-y-2">
-                <label htmlFor="fullName" className="text-sm font-medium text-foreground">
-                  Full name
-                </label>
-                <div className="relative">
-                  <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <input
-                    id="fullName"
-                    type="text"
-                    autoComplete="name"
-                    placeholder="Your name"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                    maxLength={120}
-                    className="w-full pl-11 pr-4 py-3 bg-input border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
-                  />
-                </div>
+            <div className="space-y-2">
+              <label htmlFor="fullName" className="text-sm font-medium text-foreground">
+                Full name
+              </label>
+              <div className="relative">
+                <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  id="fullName"
+                  type="text"
+                  autoComplete="name"
+                  placeholder="Your name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  maxLength={120}
+                  className="w-full pl-11 pr-4 py-3 bg-input border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-all"
+                />
               </div>
-
-              <fieldset className="space-y-2">
-                <legend className="text-sm font-medium text-foreground">I am joining as</legend>
-                <div
-                  role="radiogroup"
-                  aria-label="Account type"
-                  className="grid grid-cols-2 gap-2"
-                >
-                  {USER_TYPES.map((type) => {
-                    const isSelected = userType === type.id;
-                    return (
-                      <button
-                        key={type.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={isSelected}
-                        onClick={() => {
-                          setUserType(type.id);
-                          if (type.id === "member") setInstructorLocation(null);
-                        }}
-                        className={`text-left rounded-xl border px-4 py-3 transition-all focus:outline-none focus:ring-2 focus:ring-ring ${
-                          isSelected
-                            ? "border-primary bg-primary/5 text-foreground"
-                            : "border-border bg-input hover:border-foreground/30 text-foreground"
-                        }`}
-                      >
-                        <div className="text-sm font-semibold">{type.label}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5 leading-snug">
-                          {type.description}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-
-              {userType === "instructor" ? (
-                <PrimaryLocationField onChange={setInstructorLocation} disabled={isLoading} />
-              ) : null}
-            </>
+            </div>
           )}
 
           <div className="space-y-2">
@@ -351,11 +245,7 @@ export function AuthForm() {
               </div>
               <textarea
                 id="bio"
-                placeholder={
-                  userType === "instructor"
-                    ? "Tell members about your style, training, and vibe."
-                    : "A line or two about you — your favorite dance style, what you're looking for…"
-                }
+                placeholder="A line or two about you — your favorite dance style, what you're looking for…"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 maxLength={BIO_MAX_LENGTH}

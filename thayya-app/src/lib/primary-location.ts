@@ -1,5 +1,5 @@
 /**
- * Payload for `register-user-profile` Edge Function (instructor primary location).
+ * Payload for profile location fields (member onboarding or admin instructor create).
  * GeoJSON Point uses [lng, lat] per PostGIS / RFC 7946.
  */
 export type PrimaryLocationPayload = {

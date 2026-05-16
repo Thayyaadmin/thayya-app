@@ -2,7 +2,8 @@
 -- Run in Supabase Dashboard → SQL Editor (or `supabase db execute` against the project).
 -- Idempotent — safe to re-run.
 --
--- Covers: public.profiles, public.workshops, public.workshop_registrations
+-- Covers: public.profiles, public.workshops, public.workshop_registrations,
+--         public.categories, public.profile_categories
 -- (workshop_registrations has RLS ON and zero policies by design — edge functions use service role.)
 --
 -- If you had custom policies on other tables, restore those separately.
@@ -119,3 +120,21 @@ create policy "workshops_delete_own_instructor"
 -- =============================================================================
 
 alter table public.workshop_registrations enable row level security;
+
+-- =============================================================================
+-- public.categories — RLS on, no policies (Edge Functions use service role)
+-- =============================================================================
+
+alter table public.categories enable row level security;
+
+drop policy if exists "categories_select_active" on public.categories;
+
+-- =============================================================================
+-- public.profile_categories — RLS on, no policies
+-- =============================================================================
+
+alter table public.profile_categories enable row level security;
+
+drop policy if exists "profile_categories_select_public_instructors" on public.profile_categories;
+drop policy if exists "profile_categories_insert_own_instructor" on public.profile_categories;
+drop policy if exists "profile_categories_delete_own_instructor" on public.profile_categories;
