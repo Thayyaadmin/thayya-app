@@ -1,5 +1,13 @@
-import { ComingSoonPanel } from "@/components/site/elements/coming-soon-panel";
+import { AdminInstructorsPage } from "@/components/site/elements/admin-instructors-page";
+import { fetchActiveCategories } from "@/lib/categories-catalog";
 
-export default function AdminInstructorsRoute() {
-  return <ComingSoonPanel title="Instructors admin is coming soon." />;
+export default async function AdminInstructorsRoute() {
+  let categories: Awaited<ReturnType<typeof fetchActiveCategories>> = [];
+  try {
+    categories = await fetchActiveCategories();
+  } catch {
+    categories = [];
+  }
+
+  return <AdminInstructorsPage categories={categories} />;
 }

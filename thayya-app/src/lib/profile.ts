@@ -92,7 +92,6 @@ export async function getCurrentProfile(
 export interface ProfileUpdateInput {
   full_name?: string;
   bio?: string | null;
-  user_type?: Exclude<UserType, "admin">;
 }
 
 /**
@@ -124,10 +123,6 @@ export async function updateCurrentProfile(
       payload.bio = trimmed.length === 0 ? null : trimmed;
     }
   }
-  if (patch.user_type) {
-    payload.user_type = patch.user_type;
-  }
-
   if (Object.keys(payload).length === 0) {
     const existing = await getProfileById(client, user.id);
     if (!existing) throw new Error("Profile not found.");

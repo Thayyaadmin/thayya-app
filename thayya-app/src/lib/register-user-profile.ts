@@ -2,7 +2,6 @@ import { getSupabaseEnv } from "@/lib/supabase-env";
 import type { PrimaryLocationPayload } from "@/lib/primary-location";
 
 export type RegisterUserProfileBody = {
-  user_type: "member" | "instructor";
   full_name: string;
   bio?: string | null;
 } & Partial<
@@ -10,7 +9,7 @@ export type RegisterUserProfileBody = {
 >;
 
 /**
- * Updates the signed-in user's profile via the `register-user-profile` Edge Function.
+ * Member onboarding: updates the signed-in user's profile via `register-user-profile`.
  * Requires a valid access token (same JWT as Supabase client).
  */
 export async function registerUserProfile(
