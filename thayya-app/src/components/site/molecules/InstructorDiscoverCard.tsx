@@ -43,18 +43,13 @@ export function InstructorDiscoverCard({
           </div>
         )}
       </div>
-      <div className="font-display text-base font-bold md:text-lg">{fullName || "Instructor"}</div>
-      {bio ? (
-        <div className="line-clamp-2 text-xs" style={{ color: "var(--ink-muted)" }}>
-          {bio}
-        </div>
-      ) : null}
+      <div className="font-display text-base font-bold md:text-lg px-4 py-2 rounded-b-2xl">{fullName || "Instructor"}</div>
     </>
   );
 
   if (href) {
     return (
-      <Link href={href} className="lift text-left">
+      <Link href={href} className="lift text-left rounded-2xl">
         {inner}
       </Link>
     );
