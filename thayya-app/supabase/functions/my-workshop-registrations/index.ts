@@ -4,6 +4,7 @@ import {
   corsHeaders,
   requireAuthenticatedUser,
 } from "../_shared/require-authenticated-user.ts";
+import { canMarkSelfAttendance } from "../_shared/workshop-attendance-rules.ts";
 
 const LOG = "my-workshop-registrations";
 const FETCH_CAP = 500;
@@ -13,6 +14,7 @@ const REGISTRATION_SELECT = `
   workshop_id,
   status,
   created_at,
+  attended_at,
   workshop:workshops!inner (
     id,
     slug,
@@ -63,6 +65,7 @@ type RegistrationRow = {
   workshop_id: string;
   status: string;
   created_at: string;
+  attended_at: string | null;
   workshop: WorkshopEmbed;
 };
 
@@ -71,6 +74,9 @@ export type RegistrationListItem = {
   registered_at: string;
   /** User's 1–5 rating when they reviewed this past workshop (past list only). */
   review_rating?: number | null;
+  attended?: boolean;
+  /** Member can self check-in on workshop day or after. */
+  can_mark_attendance?: boolean;
   workshop: {
     id: string;
     slug: string | null;
@@ -98,9 +104,12 @@ function mapRow(row: RegistrationRow): RegistrationListItem {
     (w.instructor != null && String(w.instructor)) ||
     null;
 
+  const workshopDate = w.date != null ? String(w.date) : null;
   return {
     registration_id: row.id,
     registered_at: row.created_at,
+    attended: row.attended_at != null && row.attended_at !== "",
+    can_mark_attendance: canMarkSelfAttendance(workshopDate),
     workshop: {
       id: w.id,
       slug: w.slug,

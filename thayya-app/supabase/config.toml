@@ -56,6 +56,14 @@ verify_jwt = true
 [functions.submit-workshop-review]
 verify_jwt = true
 
+# JWT: member marks their own attendance for a registered workshop.
+[functions.mark-workshop-attendance]
+verify_jwt = true
+
+# JWT: member cancels their own upcoming workshop booking.
+[functions.cancel-workshop-registration]
+verify_jwt = true
+
 # JWT: admin only — create or promote instructor accounts (service role in function).
 [functions.admin-create-instructor]
 verify_jwt = true

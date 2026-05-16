@@ -290,7 +290,6 @@ export function WorkshopsTable({ refreshToken = 0, onEdit }: WorkshopsTableProps
   const [loadError, setLoadError] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-
   const loadWorkshops = useCallback(async () => {
     setLoading(true)
     setLoadError(null)

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { StarRating } from "@/components/site/atoms/StarRating";
+import { MemberCheckInButton } from "@/components/site/elements/member-check-in-button";
 import { WorkshopReviewDialog } from "@/components/site/elements/workshop-review-dialog";
 import { formatWorkshopPrice, formatWorkshopVenue } from "@/lib/workshop-display";
 import type { MyWorkshopRegistration } from "@/lib/my-workshop-registrations";
@@ -44,7 +45,9 @@ export function MemberPastBookingRow({ item }: MemberPastBookingRowProps) {
   const title = w.title?.trim() || "Untitled workshop";
   const href = workshopPublicPath(w);
   const [reviewRating, setReviewRating] = useState<number | null>(item.review_rating ?? null);
+  const [attended, setAttended] = useState(item.attended ?? false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const canCheckIn = item.can_mark_attendance === true;
 
   return (
     <>
@@ -68,6 +71,11 @@ export function MemberPastBookingRow({ item }: MemberPastBookingRowProps) {
             <div className="truncate font-display text-base font-bold md:text-lg">{title}</div>
             <div className="text-xs" style={{ color: "var(--ink-muted)" }}>
               {formatBookingSubtitle(item)}
+              {attended ? (
+                <span className="ml-1 font-medium" style={{ color: "var(--t-teal)" }}>
+                  · Checked in
+                </span>
+              ) : null}
             </div>
           </div>
           <div className="font-display hidden shrink-0 text-base font-bold sm:block">
@@ -75,7 +83,13 @@ export function MemberPastBookingRow({ item }: MemberPastBookingRowProps) {
           </div>
         </Link>
 
-        <div className="flex shrink-0 items-center justify-between gap-3 border-t pt-3 sm:flex-col sm:justify-center sm:border-t-0 sm:border-l sm:pt-0 sm:pl-4">
+        <div className="flex shrink-0 flex-col items-stretch gap-3 border-t pt-3 sm:items-center sm:justify-center sm:border-t-0 sm:border-l sm:pt-0 sm:pl-4">
+          <MemberCheckInButton
+            workshopId={w.id}
+            attended={attended}
+            canMarkAttendance={canCheckIn}
+            onAttendedChange={setAttended}
+          />
           {reviewRating != null ? (
             <div className="flex flex-col items-start gap-1 sm:items-center">
               <span
@@ -97,7 +111,9 @@ export function MemberPastBookingRow({ item }: MemberPastBookingRowProps) {
           ) : (
             <button
               type="button"
-              className="gradient-bg-warm rounded-full px-4 py-2 text-sm font-bold text-white"
+              className="gradient-bg-warm rounded-full px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+              disabled={!attended}
+              title={!attended ? "Check in before rating this class" : undefined}
               onClick={() => setDialogOpen(true)}
             >
               Rate class

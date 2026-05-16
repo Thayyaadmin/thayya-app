@@ -2,6 +2,7 @@ import {
   corsHeaders,
   requireAuthenticatedUser,
 } from "../_shared/require-authenticated-user.ts";
+import { updateInstructorRatingCache } from "../_shared/update-instructor-rating-cache.ts";
 
 const LOG = "submit-workshop-review";
 
@@ -132,7 +133,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: registration, error: regErr } = await admin
     .from("workshop_registrations")
-    .select("id, status")
+    .select("id, status, attended_at")
     .eq("workshop_id", workshopId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -150,14 +151,25 @@ Deno.serve(async (req: Request) => {
       { status: 403, headers: corsHeaders },
     );
   }
+  if (!registration.attended_at) {
+    return Response.json(
+      { error: "Check in to this workshop before leaving a rating" },
+      { status: 403, headers: corsHeaders },
+    );
+  }
 
   const nowIso = new Date().toISOString();
   const { data: existing } = await admin
     .from("workshop_reviews")
-    .select("id")
+    .select("id, rating")
     .eq("workshop_id", workshopId)
     .eq("user_id", user.id)
-    .maybeSingle();
+    .maybeSingle<{ id: string; rating: number }>();
+
+  const previousRating =
+    existing?.id != null && typeof existing.rating === "number"
+      ? existing.rating
+      : null;
 
   let review: ReviewRow | null = null;
   let error: { message: string; code?: string } | null = null;
@@ -191,6 +203,20 @@ Deno.serve(async (req: Request) => {
     return Response.json(
       { error: error?.message ?? "Could not save rating" },
       { status: 400, headers: corsHeaders },
+    );
+  }
+
+  const cacheResult = await updateInstructorRatingCache(
+    admin,
+    instructorId,
+    rating,
+    previousRating,
+  );
+  if (cacheResult.error) {
+    console.error(`[${LOG}] instructor rating cache`, cacheResult.error);
+    return Response.json(
+      { error: "Rating saved but instructor profile could not be updated" },
+      { status: 500, headers: corsHeaders },
     );
   }
 

@@ -1,11 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import postgres from "npm:postgres@3";
 
-import {
-  attachRatingToInstructor,
-  fetchInstructorRatingSummaries,
-} from "../_shared/instructor-ratings.ts";
-
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -22,6 +17,8 @@ type InstructorRow = {
   bio: string | null;
   user_type: string;
   avatar_url: string | null;
+  rating_avg: number | string | null;
+  rating_count: number;
 };
 
 type NearbyInstructorRow = InstructorRow & { distance_m: number | string };
@@ -103,6 +100,8 @@ Deno.serve(async (req: Request) => {
           bio,
           user_type,
           avatar_url,
+          rating_avg,
+          rating_count,
           st_distance(
             primary_location,
             st_setsrid(st_makepoint(${viewer.lng}, ${viewer.lat}), 4326)::geography
@@ -120,25 +119,17 @@ Deno.serve(async (req: Request) => {
         limit ${MAX_RESULTS}
       `) as unknown as NearbyInstructorRow[];
 
-      const baseInstructors: InstructorRow[] = rows.map((row) => ({
+      const instructors: InstructorRow[] = rows.map((row) => ({
         id: row.id,
         full_name: row.full_name,
         slug: row.slug,
         bio: row.bio,
         user_type: row.user_type,
         avatar_url: row.avatar_url ?? null,
+        rating_avg: row.rating_avg != null ? Number(row.rating_avg) : null,
+        rating_count:
+          typeof row.rating_count === "number" ? row.rating_count : 0,
       }));
-
-      const admin = createClient(url, serviceKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
-      const ratingSummaries = await fetchInstructorRatingSummaries(
-        admin,
-        baseInstructors.map((i) => i.id),
-      );
-      const instructors = baseInstructors.map((inst) =>
-        attachRatingToInstructor(inst, ratingSummaries),
-      );
 
       return Response.json(
         {
@@ -164,7 +155,7 @@ Deno.serve(async (req: Request) => {
 
   const { data, error } = await admin
     .from("profiles")
-    .select("id, full_name, slug, bio, user_type, avatar_url")
+    .select("id, full_name, slug, bio, user_type, avatar_url, rating_avg, rating_count")
     .eq("user_type", "instructor")
     .not("slug", "is", null)
     .order("created_at", { ascending: false })
@@ -178,14 +169,11 @@ Deno.serve(async (req: Request) => {
     );
   }
 
-  const baseInstructors = (data ?? []) as InstructorRow[];
-  const ratingSummaries = await fetchInstructorRatingSummaries(
-    admin,
-    baseInstructors.map((i) => i.id),
-  );
-  const instructors = baseInstructors.map((inst) =>
-    attachRatingToInstructor(inst, ratingSummaries),
-  );
+  const instructors = ((data ?? []) as InstructorRow[]).map((row) => ({
+    ...row,
+    rating_avg: row.rating_avg != null ? Number(row.rating_avg) : null,
+    rating_count: typeof row.rating_count === "number" ? row.rating_count : 0,
+  }));
 
   return Response.json(
     { instructors, search: "featured" as const },

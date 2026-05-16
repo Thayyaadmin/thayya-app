@@ -2,8 +2,9 @@
 -- Run AFTER workshop-registrations.sql (needs workshops + profiles).
 -- Idempotent.
 --
--- One review per (user, workshop). Instructor aggregate ratings are computed
--- from `instructor_id` (denormalized from workshops.instructor_id at submit time).
+-- One review per (user, workshop). `instructor_id` is denormalized from
+-- workshops.instructor_id at submit time. Cached aggregates on profiles are
+-- updated in submit-workshop-review (see profiles-instructor-rating.sql).
 
 -- ============================================================================
 -- 1. Table

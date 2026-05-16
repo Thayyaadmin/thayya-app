@@ -64,7 +64,7 @@ export function InstructorDiscoverCard({
 
   if (href) {
     return (
-      <Link href={href} className="lift text-left">
+      <Link href={href} className="lift text-left rounded-2xl">
         {inner}
       </Link>
     );

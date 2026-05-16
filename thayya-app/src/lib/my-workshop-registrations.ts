@@ -23,6 +23,8 @@ export type MyWorkshopRegistration = {
   registered_at: string;
   /** Present on past workshops: user's 1–5 rating, or null if not yet rated. */
   review_rating?: number | null;
+  attended?: boolean;
+  can_mark_attendance?: boolean;
   workshop: MyWorkshopRegistrationWorkshop;
 };
 
