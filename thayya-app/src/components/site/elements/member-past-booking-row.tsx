@@ -48,6 +48,7 @@ export function MemberPastBookingRow({ item }: MemberPastBookingRowProps) {
   const [attended, setAttended] = useState(item.attended ?? false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const canCheckIn = item.can_mark_attendance === true;
+  const canRate = attended || reviewRating != null;
 
   return (
     <>
@@ -90,7 +91,8 @@ export function MemberPastBookingRow({ item }: MemberPastBookingRowProps) {
             canMarkAttendance={canCheckIn}
             onAttendedChange={setAttended}
           />
-          {reviewRating != null ? (
+          {canRate ? (
+            reviewRating != null ? (
             <div className="flex flex-col items-start gap-1 sm:items-center">
               <span
                 className="text-[10px] font-semibold tracking-wider uppercase"
@@ -108,17 +110,20 @@ export function MemberPastBookingRow({ item }: MemberPastBookingRowProps) {
                 Change
               </button>
             </div>
-          ) : (
-            <button
-              type="button"
-              className="gradient-bg-warm rounded-full px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
-              disabled={!attended}
-              title={!attended ? "Check in before rating this class" : undefined}
-              onClick={() => setDialogOpen(true)}
-            >
-              Rate class
-            </button>
-          )}
+            ) : (
+              <button
+                type="button"
+                className="gradient-bg-warm rounded-full px-4 py-2 text-sm font-bold text-white"
+                onClick={() => setDialogOpen(true)}
+              >
+                Rate class
+              </button>
+            )
+          ) : canCheckIn ? (
+            <p className="max-w-[200px] text-center text-xs" style={{ color: "var(--ink-muted)" }}>
+              Check in to rate this class
+            </p>
+          ) : null}
         </div>
       </div>
 
